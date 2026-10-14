@@ -81,9 +81,15 @@ async def get_menu_detail(menu_id: str) -> dict:
 
 
 async def get_all_menus_for_seller() -> list[dict]:
-    """Return ALL menus regardless of status, for seller management view."""
+    """Return all active menus (is_active=True) for seller management view."""
     client = get_service_client()
-    response = client.table("menus").select("*").order("created_at", desc=True).execute()
+    response = (
+        client.table("menus")
+        .select("*")
+        .eq("is_active", True)
+        .order("created_at", desc=True)
+        .execute()
+    )
     return response.data or []
 
 
@@ -108,22 +114,22 @@ async def update_menu(menu_id: str, data: MenuUpdate) -> dict:
     updates: dict = {}
     for field, value in data.model_dump().items():
         if value is not None:
-            updates[field] = float(value) if field == "price" else value
+            updates[field] = value
 
     if not updates:
-        # Nothing to update — fetch and return current state
-        response = (
-            client.table("menus").select("*").eq("id", menu_id).maybe_single().execute()
+        raise HTTPException(
+            status_code=422,
+            detail={"error": {"code": "VALIDATION_ERROR", "message": "No fields to update"}},
         )
-        if response.data is None:
-            raise HTTPException(
-                status_code=404,
-                detail={"error": {"code": "MENU_NOT_FOUND", "message": "Menu not found"}},
-            )
-        return response.data
+
+    if "price" in updates:
+        updates["price"] = float(updates["price"])
 
     response = (
-        client.table("menus").update(updates).eq("id", menu_id).execute()
+        client.table("menus")
+        .update(updates)
+        .eq("id", menu_id)
+        .execute()
     )
     if not response.data:
         raise HTTPException(
@@ -133,8 +139,8 @@ async def update_menu(menu_id: str, data: MenuUpdate) -> dict:
     return response.data[0]
 
 
-async def set_availability(menu_id: str, is_available: bool) -> dict:
-    """Set is_available on a menu. Returns updated menu."""
+async def set_menu_availability(menu_id: str, is_available: bool) -> dict:
+    """Toggle menu availability. Raises 404 if the menu does not exist."""
     client = get_service_client()
     response = (
         client.table("menus")
@@ -176,59 +182,54 @@ async def delete_menu(menu_id: str) -> None:
 
 
 async def upload_menu_image(file: UploadFile) -> str:
-    """Validate, upload, and return the public URL of a menu image.
+    """Validate and upload a menu image to Supabase Storage.
 
-    Raises 400 for invalid type or oversized file.
+    Returns the public URL of the uploaded image.
     """
-    # 1. Validate content-type header
     if file.content_type not in _ALLOWED_CONTENT_TYPES:
         raise HTTPException(
-            status_code=400,
+            status_code=422,
             detail={
                 "error": {
                     "code": "INVALID_FILE_TYPE",
-                    "message": "File must be JPEG, PNG, or WebP",
+                    "message": f"Unsupported file type '{file.content_type}'. Allowed: JPEG, PNG, WebP.",
                 }
             },
         )
 
-    # 2. Read file bytes
     data = await file.read()
 
-    # 3. Validate size
     if len(data) > _MAX_FILE_SIZE:
         raise HTTPException(
-            status_code=400,
+            status_code=422,
             detail={
                 "error": {
                     "code": "FILE_TOO_LARGE",
-                    "message": "File must not exceed 5 MB",
+                    "message": f"File exceeds the 5 MB limit ({len(data) / 1_048_576:.1f} MB received).",
                 }
             },
         )
 
-    # 4. Validate magic bytes
     if not _check_magic(file.content_type, data):
         raise HTTPException(
-            status_code=400,
+            status_code=422,
             detail={
                 "error": {
-                    "code": "INVALID_FILE_TYPE",
-                    "message": "File content does not match declared type",
+                    "code": "INVALID_FILE_CONTENT",
+                    "message": "File content does not match the declared content type.",
                 }
             },
         )
 
-    # 5. Generate new filename
     ext = _CONTENT_TYPE_TO_EXT[file.content_type]
-    path = f"{uuid4()}.{ext}"
+    filename = f"{uuid4()}.{ext}"
 
-    # 6. Upload to Supabase Storage
     client = get_service_client()
     client.storage.from_("menu-images").upload(
-        path, data, file_options={"content-type": file.content_type}
+        path=filename,
+        file=data,
+        file_options={"content-type": file.content_type},
     )
 
-    # 7. Return the public URL
-    url: str = client.storage.from_("menu-images").get_public_url(path)
-    return url
+    public_url = client.storage.from_("menu-images").get_public_url(filename)
+    return public_url

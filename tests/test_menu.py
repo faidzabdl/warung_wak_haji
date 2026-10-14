@@ -228,7 +228,7 @@ async def test_set_availability_toggle(client: AsyncClient):
     """Valid auth, is_available=false → 200 with updated menu."""
     updated = {**MENU_1, "is_available": False}
     with patch(
-        "routers.seller.set_availability",
+        "routers.seller.set_menu_availability",
         new_callable=AsyncMock,
         return_value=updated,
     ):
@@ -264,7 +264,7 @@ async def test_upload_image_invalid_type(client: AsyncClient):
         files={"file": ("test.txt", BytesIO(b"hello world"), "text/plain")},
         headers=_seller_auth_header(),
     )
-    assert response.status_code == 400
+    assert response.status_code == 422
     assert response.json()["error"]["code"] == "INVALID_FILE_TYPE"
 
 
@@ -277,7 +277,7 @@ async def test_upload_image_too_large(client: AsyncClient):
         files={"file": ("big.jpg", BytesIO(large_bytes), "image/jpeg")},
         headers=_seller_auth_header(),
     )
-    assert response.status_code == 400
+    assert response.status_code == 422
     assert response.json()["error"]["code"] == "FILE_TOO_LARGE"
 
 

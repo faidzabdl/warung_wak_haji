@@ -13,7 +13,7 @@ from services.menu_service import (
     create_menu,
     delete_menu,
     get_all_menus_for_seller,
-    set_availability,
+    set_menu_availability,
     update_menu,
     upload_menu_image,
 )
@@ -81,7 +81,7 @@ async def set_availability_endpoint(
     _uid: str = Depends(require_seller),
 ):
     """Toggle menu availability. (Seller only)"""
-    return await set_availability(menu_id, data.is_available)
+    return await set_menu_availability(menu_id, data.is_available)
 
 
 @router.delete("/seller/menus/{menu_id}", status_code=204)
