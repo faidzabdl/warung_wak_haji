@@ -13,7 +13,6 @@ import {
   type OrderDuplicateResponse,
   type OrderListItem,
   type OrderTrackResponse,
-  type ProofUploadResponse,
   type HistoryResponse,
 } from '@/types/api'
 
@@ -105,32 +104,6 @@ export async function createOrder(
   return { data, status: res.status }
 }
 
-export async function uploadProof(
-  orderNumber: string,
-  file: File,
-  trackingToken: string
-): Promise<ProofUploadResponse> {
-  const fd = new FormData()
-  fd.append('file', file)
-
-  const res = await fetch(`${BASE_URL}/orders/${orderNumber}/proof`, {
-    method: 'POST',
-    headers: {
-      'X-Tracking-Token': trackingToken,
-    },
-    body: fd,
-  })
-
-  if (!res.ok) {
-    let errBody: ApiErrorResponse | null = null
-    try { errBody = await res.json() } catch { /* empty */ }
-    const detail = errBody?.error ?? { code: 'HTTP_ERROR', message: `HTTP ${res.status}` }
-    throw new ApiError(res.status, detail)
-  }
-
-  return res.json()
-}
-
 export async function trackOrder(token: string): Promise<OrderTrackResponse> {
   return request<OrderTrackResponse>('GET', `/orders/track/${token}`)
 }
@@ -168,6 +141,10 @@ export async function setMenuAvailability(
   return request<MenuResponse>('PATCH', `/seller/menus/${menuId}/availability`, { token, body })
 }
 
+export async function deleteMenu(menuId: string, token: string): Promise<void> {
+  return request<void>('DELETE', `/seller/menus/${menuId}`, { token })
+}
+
 // ─── Seller — Orders ─────────────────────────────────────────────────────────
 
 export async function getSellerOrders(token: string): Promise<OrderListItem[]> {
@@ -187,10 +164,10 @@ export async function verifyPayment(
 
 export async function rejectPayment(
   orderNumber: string,
-  reason: string,
+  reason: string | null | undefined,
   token: string
 ): Promise<{ order_number: string; order_status: string; payment_status: string }> {
-  return request('POST', `/seller/orders/${orderNumber}/reject-payment`, { token, body: { reason } })
+  return request('POST', `/seller/orders/${orderNumber}/reject-payment`, { token, body: { reason: reason ?? null } })
 }
 
 export async function startProcessing(
@@ -198,6 +175,13 @@ export async function startProcessing(
   token: string
 ): Promise<{ order_number: string; order_status: string }> {
   return request('POST', `/seller/orders/${orderNumber}/start-processing`, { token })
+}
+
+export async function markReady(
+  orderNumber: string,
+  token: string
+): Promise<{ order_number: string; order_status: string }> {
+  return request('POST', `/seller/orders/${orderNumber}/mark-ready`, { token })
 }
 
 export async function completeOrder(
@@ -209,10 +193,10 @@ export async function completeOrder(
 
 export async function cancelOrder(
   orderNumber: string,
-  reason: string,
+  reason: string | null | undefined,
   token: string
 ): Promise<{ order_number: string; order_status: string }> {
-  return request('POST', `/seller/orders/${orderNumber}/cancel`, { token, body: { reason } })
+  return request('POST', `/seller/orders/${orderNumber}/cancel`, { token, body: { reason: reason ?? null } })
 }
 
 export async function getHistory(

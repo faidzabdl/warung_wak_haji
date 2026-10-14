@@ -1,0 +1,695 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Warung Wak Haji</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#e6d4a9; --ink:#0d0d0d; --brand:#85582f; --brand-dark:#3f2a1a; --line:#7a1d12;
+  --on-brand:#1c1209; --field:#ecdcb6; --muted:#8a7a5c; --toast:#3f2a1a; --toast-ink:#f6ead0;
+  box-sizing:border-box; padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){--bg:#241a10;--ink:#f3e6c6;--brand:#85582f;--brand-dark:#5a3b20;--line:#b0452f;--on-brand:#fbf1da;--field:#33261a;--muted:#a69473;--toast:#f3e6c6;--toast-ink:#241a10}
+}
+:root[data-theme="dark"]{--bg:#241a10;--ink:#f3e6c6;--brand:#85582f;--brand-dark:#5a3b20;--line:#b0452f;--on-brand:#fbf1da;--field:#33261a;--muted:#a69473;--toast:#f3e6c6;--toast-ink:#241a10}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*,*::before,*::after{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+button,input{font:inherit;color:inherit}
+.wrap{max-width:1080px;margin:0 auto;padding:32px 18px 56px}
+
+/* header */
+.top{display:flex;align-items:center;gap:clamp(18px,5vw,40px);padding-top:6px}
+.logo{flex:none;width:clamp(96px,28vw,112px);aspect-ratio:1;border-radius:50%;background:var(--brand);display:grid;place-items:center;font-size:clamp(1.25rem,4.5vw,1.6rem);color:var(--on-brand)}
+.brand{margin:0;font-weight:400;font-size:clamp(1.5rem,5.4vw,2.3rem);letter-spacing:-.01em;line-height:1.1}
+.hero{margin-top:clamp(28px,6vw,48px);padding-bottom:12px;border-bottom:3px solid var(--ink)}
+.hero h2{margin:0;font-size:clamp(1.65rem,6.2vw,2.6rem);font-weight:800;letter-spacing:-.02em;line-height:1.1}
+.hero p{margin:4px 0 0;font-size:clamp(.95rem,3.4vw,1.2rem);line-height:1.25;font-weight:500}
+.hero p br{display:block}
+
+/* filters */
+.filters{display:flex;gap:14px;margin:26px 0 22px 12px;flex-wrap:wrap}
+.dd{position:relative}
+.dd-btn{display:inline-flex;align-items:center;gap:10px;padding:7px 11px;border:2px solid var(--brand-dark);border-radius:7px;background:transparent;font-weight:700;font-size:.82rem;cursor:pointer;transition:transform .12s,background .15s}
+.dd-btn:active{transform:scale(.97)}
+.dd-btn.solid{background:var(--brand-dark);color:#fff}
+.dd-btn:focus-visible,.pesan:focus-visible,.submit:focus-visible,.step button:focus-visible,.field input:focus-visible{outline:3px solid var(--line);outline-offset:2px}
+.caret{width:0;height:0;border:4px solid transparent;border-top:5px solid currentColor;border-bottom:0;transition:transform .15s}
+.dd.open .caret{transform:rotate(180deg)}
+.dd-menu{position:absolute;z-index:5;top:calc(100% + 6px);left:0;min-width:100%;margin:0;padding:5px;list-style:none;background:var(--bg);border:2px solid var(--brand-dark);border-radius:9px;box-shadow:0 8px 20px rgba(40,22,5,.22)}
+.dd-menu li{padding:7px 10px;border-radius:6px;font-size:.84rem;font-weight:500;white-space:nowrap;cursor:pointer}
+.dd-menu li:hover,.dd-menu li.on{background:var(--brand);color:#fff}
+
+/* grid + card */
+.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:18px 18px}
+@media(min-width:640px){.grid{grid-template-columns:repeat(3,1fr);gap:26px}}
+@media(min-width:960px){.grid{grid-template-columns:repeat(4,1fr)}}
+.card{display:flex;flex-direction:column;border:1.5px solid var(--line);border-radius:32px;padding:10px 10px 16px;min-width:0;transition:transform .2s,box-shadow .2s}
+@media(hover:hover){.card:hover{transform:translateY(-3px);box-shadow:0 10px 22px rgba(90,40,10,.18)}}
+.thumb{aspect-ratio:1/.95;border-radius:28px;background:var(--brand);display:grid;place-items:center;color:rgba(255,255,255,.28)}
+.thumb svg{width:38%;height:auto}
+.name{margin:12px 6px 0;font-size:.82rem;font-weight:400;text-transform:uppercase;letter-spacing:.01em;overflow-wrap:anywhere}
+.price{margin:3px 6px 8px auto;font-size:.8rem;text-align:right}
+.pesan{margin-top:auto;height:34px;border:0;border-radius:8px;background:var(--brand);color:var(--on-brand);font-size:.82rem;cursor:pointer;transition:filter .15s,transform .1s}
+.pesan:hover{filter:brightness(1.1)}.pesan:active{transform:scale(.98)}
+.step{margin-top:auto;height:34px;display:flex;align-items:center;justify-content:space-between;border-radius:8px;background:var(--brand);color:var(--on-brand)}
+.step button{width:40px;height:100%;border:0;background:transparent;font-size:1.15rem;cursor:pointer;border-radius:8px}
+.step span{font-weight:700;font-size:.85rem}
+.empty{grid-column:1/-1;text-align:center;padding:40px 0;color:var(--muted)}
+
+/* form */
+.order{margin:44px 0 0 clamp(0px,2vw,10px);max-width:520px}
+.sum{margin:0 0 12px;font-size:.82rem;color:var(--muted)}
+.field{display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:.85rem}
+.field label{flex:none;width:96px}
+.field input{flex:1;min-width:0;height:26px;padding:0 10px;border:1.2px solid var(--ink);border-radius:7px;background:var(--field);font-size:.8rem}
+.field input::placeholder{color:var(--muted);font-size:.7rem}
+.field.err input{border-color:var(--line);box-shadow:0 0 0 2px rgba(122,29,18,.25)}
+.msg{margin:0 0 8px 104px;font-size:.72rem;color:var(--line)}
+.actions{display:flex;justify-content:flex-end;margin-top:40px}
+.submit{padding:9px 20px;border:2px solid var(--ink);border-radius:8px;background:var(--brand);color:var(--on-brand);font-weight:700;font-size:.85rem;cursor:pointer;transition:filter .15s,transform .1s}
+.submit:hover{filter:brightness(1.1)}.submit:active{transform:scale(.97)}
+@media(min-width:640px){.order{max-width:none;display:grid;grid-template-columns:1fr;} .field input{max-width:420px}.actions{max-width:520px;margin-top:28px}}
+/* penjual & role switch */
+.roles{display:flex;width:fit-content;margin:0 0 20px auto;padding:3px;border:2px solid var(--brand-dark);border-radius:999px}
+.roles button{display:inline-flex;align-items:center;padding:6px 14px;border:0;border-radius:999px;background:transparent;font-weight:700;font-size:.78rem;cursor:pointer;transition:background .15s}
+.roles button.on{background:var(--brand-dark);color:#fff}
+.roles button:focus-visible,.act:focus-visible,.sw:focus-visible,.chip:focus-visible{outline:3px solid var(--line);outline-offset:2px}
+.cnt{display:inline-grid;place-items:center;min-width:18px;height:18px;margin-left:7px;padding:0 5px;border-radius:9px;background:#d9a21b;color:#2b1a05;font-size:.68rem;font-style:normal;font-weight:800}
+.pesan:disabled{opacity:.5;cursor:not-allowed;filter:none}
+.og{display:grid;grid-template-columns:1fr;gap:18px}
+@media(min-width:640px){.og{grid-template-columns:repeat(2,1fr);gap:24px}}
+@media(min-width:960px){.og{grid-template-columns:repeat(3,1fr)}}
+.oc{padding:16px}
+.oc-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+.oc-meja{margin:0;font-size:1.05rem;font-weight:800;text-transform:none}
+.oc-sub{margin:2px 0 0;font-size:.74rem;color:var(--muted)}
+.oc-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:auto;padding-top:12px}
+.act{flex:1 1 90px;height:36px;padding:0 10px;border:1.5px solid var(--brand-dark);border-radius:8px;background:transparent;font-weight:600;font-size:.78rem;cursor:pointer;transition:filter .15s,transform .1s}
+.act:active{transform:scale(.97)}
+.act.main{background:var(--brand);border-color:var(--brand);color:var(--on-brand)}
+.PREPARING .badge{background:#c9702a;color:#fff}.READY .badge{background:#4f7d3a;color:#fff}.DONE .badge{background:#2f5d2a;color:#fff}.CANCELLED .badge{background:#9b2c1f;color:#fff}
+.oc .badge{margin:0;white-space:nowrap}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:20px}
+.stat{padding:12px 14px;border:1.5px solid var(--line);border-radius:20px}
+.stat span{display:block;font-size:.7rem;color:var(--muted)}
+.stat b{display:block;margin-top:2px;font-size:clamp(1rem,3.6vw,1.35rem);font-weight:800;letter-spacing:-.02em;overflow-wrap:anywhere}
+@media(max-width:479px){.stat.wide{grid-column:1/-1}}
+.hist{list-style:none;margin:0;padding:0;display:grid;gap:10px}
+.hist li{display:flex;flex-wrap:wrap;justify-content:space-between;gap:6px 14px;padding:12px 16px;border:1.5px solid var(--line);border-radius:20px}
+.hist .h-main{min-width:0;flex:1 1 200px}
+.hist .h-main b{font-size:.92rem}
+.hist .h-main p{margin:2px 0 0;font-size:.74rem;color:var(--muted);overflow-wrap:anywhere}
+.hist .h-side{text-align:right;display:flex;flex-direction:column;align-items:flex-end;gap:4px}
+.hist .badge{margin:0;font-size:.68rem}
+.hist-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+.ed-bar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;margin:0 0 18px 12px}
+.cat{margin:2px 6px 8px;font-size:.7rem;color:var(--muted)}
+.sw{display:flex;align-items:center;gap:8px;margin:0 6px 10px;padding:0;border:0;background:none;font-size:.76rem;font-weight:600;cursor:pointer}
+.sw i{position:relative;flex:none;width:34px;height:20px;border-radius:10px;background:var(--muted);transition:background .2s}
+.sw i::after{content:"";position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:#fff;transition:transform .2s}
+.sw[aria-checked="true"] i{background:var(--brand)}
+.sw[aria-checked="true"] i::after{transform:translateX(14px)}
+.card.off .thumb{opacity:.4}
+.mf{display:grid;gap:5px;margin-bottom:12px;font-size:.8rem}
+.mf input{width:100%;height:38px;padding:0 12px;border:1.2px solid var(--ink);border-radius:8px;background:var(--field);font-size:.9rem}
+.mf input:focus-visible{outline:3px solid var(--line);outline-offset:2px}
+.chips{display:flex;gap:8px}
+.chip{flex:1;height:38px;border:1.5px solid var(--brand-dark);border-radius:8px;background:transparent;font-weight:600;font-size:.82rem;cursor:pointer}
+.chip.on{background:var(--brand-dark);color:#fff}
+/* detail pesanan (popup penjual) */
+.modal.bare{padding-top:22px}
+.modal.bare .m-foot{justify-content:center;margin-top:20px}
+.m-foot .dt-close{flex:none;height:auto;padding:9px 30px;border:0;border-radius:999px;background:var(--brand-dark);color:#fff;font-size:1rem;font-weight:400;letter-spacing:.02em}
+.dt-head{margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--ink);font-size:1rem;line-height:1.35}
+.dt-head p{margin:0;overflow-wrap:anywhere}
+.dt-grid{display:grid;grid-template-columns:minmax(0,1fr) 32px 92px;gap:8px 10px;align-items:center;margin-bottom:12px}
+.dt-lab{font-size:.72rem;text-align:center;letter-spacing:.02em}
+.dt-name{min-height:32px;padding:6px 12px;border-radius:8px;background:var(--brand);color:#fbf1da;font-size:.82rem;line-height:1.25;overflow-wrap:anywhere;display:flex;align-items:center}
+.dt-qty{width:32px;height:32px;border-radius:8px;background:var(--brand);color:#fbf1da;font-size:.82rem;font-weight:600;display:grid;place-items:center}
+.dt-price{font-size:.78rem;white-space:nowrap}
+.dt-total{display:grid;grid-template-columns:minmax(0,1fr) 32px 92px;column-gap:10px;margin-top:16px;padding:9px 0;border-top:1px solid var(--ink);border-bottom:1px solid var(--ink);font-size:.95rem}
+.dt-total span:first-child{grid-column:1/3;text-align:center}
+.dt-total span:last-child{font-size:.78rem;align-self:center;white-space:nowrap}
+/* navbar penjual */
+.snav{position:fixed;z-index:40;left:0;right:0;bottom:0;display:grid;grid-template-columns:repeat(3,1fr);padding:6px 10px calc(6px + env(safe-area-inset-bottom,0px));background:var(--bg);border-top:1.5px solid var(--line);box-shadow:0 -6px 18px rgba(60,30,8,.12)}
+.snav button{position:relative;display:flex;flex-direction:column;align-items:center;gap:3px;padding:4px 0;border:0;border-radius:12px;background:none;color:var(--muted);font-size:.7rem;font-weight:600;cursor:pointer}
+.snav .ni{display:grid;place-items:center;width:54px;height:30px;border-radius:15px;transition:background .2s,color .2s}
+.snav .ni svg{display:block;width:20px;height:20px}
+.snav .cnt{position:absolute;top:-2px;left:calc(50% + 8px);margin:0;min-width:16px;height:16px;font-size:.62rem}
+.snav button.on{color:var(--ink)}
+.snav button.on .ni{background:var(--brand);color:var(--on-brand)}
+.snav button:focus-visible{outline:3px solid var(--line);outline-offset:-3px}
+.snav-space{height:80px}
+@media(max-width:767px){.toast.lift{bottom:calc(92px + env(safe-area-inset-bottom,0px))}}
+@media(min-width:768px){
+  .snav{position:static;display:flex;gap:4px;margin:26px 0 24px;padding:0;background:none;border:0;border-bottom:1.5px solid var(--line);box-shadow:none}
+  .snav button{flex-direction:row;gap:9px;margin-bottom:-1.5px;padding:10px 20px;border-radius:0;border-bottom:3px solid transparent;font-size:.92rem}
+  .snav .ni{width:auto;height:auto;background:none!important;color:inherit}
+  .snav button.on{border-bottom-color:var(--brand);font-weight:800}
+  .snav .cnt{position:static;margin:0}
+  .snav-space{display:none}
+}
+.ed-filters{display:flex;flex-wrap:wrap;gap:14px}
+/* pembayaran */
+.pay{border:0;margin:14px 0 4px;padding:0;min-width:0}
+.pay legend{font-size:.85rem;margin-bottom:8px;padding:0}
+.pay-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;max-width:520px}
+@media(max-width:379px){.pay-grid{grid-template-columns:1fr}}
+.opt{position:relative;display:flex;flex-direction:column;gap:3px;padding:12px;border:1.5px solid var(--line);border-radius:20px;cursor:pointer;transition:background .15s,transform .1s,box-shadow .15s}
+.opt:active{transform:scale(.98)}
+.opt input{position:absolute;inset:0;width:100%;height:100%;margin:0;opacity:0;cursor:pointer}
+.opt:focus-within{outline:3px solid var(--line);outline-offset:2px}
+.opt .ic{width:36px;height:36px;margin-bottom:6px;border-radius:11px;display:grid;place-items:center;background:var(--field);color:var(--brand-dark);border:1.2px solid var(--line)}
+.opt .ic svg{width:20px;height:20px}
+.opt b{font-size:.86rem;font-weight:700}
+.opt small{font-size:.7rem;line-height:1.35;color:var(--muted)}
+.opt .dot{position:absolute;top:12px;right:12px;width:18px;height:18px;border-radius:50%;border:2px solid var(--brand-dark);display:grid;place-items:center}
+.opt.on{background:var(--brand);color:var(--on-brand);box-shadow:0 6px 14px rgba(70,35,8,.22)}
+.opt.on small{color:inherit;opacity:.85}
+.opt.on .dot{border-color:var(--on-brand);background:var(--on-brand)}
+.opt.on .dot::after{content:"";width:6px;height:6px;border-radius:50%;background:var(--brand)}
+.opt.on .ic{background:rgba(255,255,255,.18);border-color:transparent;color:inherit}
+.msg.pay-msg{margin-left:0}
+/* modal */
+.ov{position:fixed;inset:0;z-index:50;display:flex;align-items:flex-end;justify-content:center;background:rgba(25,12,3,.55);backdrop-filter:blur(2px);animation:fade .2s}
+.modal{position:relative;width:100%;max-width:440px;max-height:92dvh;overflow-y:auto;overscroll-behavior:contain;background:var(--bg);border:2px solid var(--brand-dark);border-bottom:0;border-radius:28px 28px 0 0;padding:22px 20px calc(18px + env(safe-area-inset-bottom,0px));animation:up .25s ease-out}
+@media(min-width:640px){.ov{align-items:center;padding:20px}.modal{border-bottom:2px solid var(--brand-dark);border-radius:28px}}
+.modal:focus{outline:0}
+.x{position:absolute;top:12px;right:14px;width:34px;height:34px;border:0;background:transparent;font-size:1.6rem;line-height:1;cursor:pointer;border-radius:8px}
+.m-title{margin:0 32px 14px 0;font-size:1.2rem;font-weight:800;letter-spacing:-.01em}
+.m-foot{display:flex;gap:10px;margin-top:18px}
+.m-foot button{flex:1;height:44px;border:2px solid var(--ink);border-radius:9px;font-weight:700;font-size:.85rem;cursor:pointer;transition:filter .15s,transform .1s}
+.m-foot button:active{transform:scale(.97)}
+.m-foot button:disabled{opacity:.6;cursor:wait}
+.btn-main{background:var(--brand);color:var(--on-brand)}.btn-ghost{background:transparent}
+.x:focus-visible,.m-foot button:focus-visible,.link:focus-visible{outline:3px solid var(--line);outline-offset:2px}
+.qr-box{width:min(240px,66vw);margin:0 auto;padding:10px;background:#fff;border:1.5px solid var(--line);border-radius:16px}
+.qr-box svg{display:block;width:100%;height:auto}
+.qr-total{margin:14px 0 0;text-align:center;font-size:1.6rem;font-weight:800;letter-spacing:-.02em}
+.qr-merch{margin:2px 0 14px;text-align:center;font-size:.82rem;color:var(--muted)}
+.steps{margin:0;padding-left:18px;font-size:.8rem;line-height:1.55}
+.note{margin:12px 0 0;padding:9px 12px;border:1px dashed var(--line);border-radius:10px;background:var(--field);font-size:.74rem;line-height:1.45}
+.meta{display:flex;gap:22px;margin-bottom:6px;font-size:.82rem}
+.meta span{display:block;color:var(--muted);font-size:.7rem}
+.lines{list-style:none;margin:8px 0 0;padding:0;font-size:.84rem}
+.lines li{display:flex;justify-content:space-between;gap:12px;padding:7px 0;border-bottom:1px dashed var(--muted)}
+.lines li span:first-child{min-width:0;overflow-wrap:anywhere}
+.total-row{display:flex;justify-content:space-between;margin-top:10px;font-size:1.02rem;font-weight:800}
+/* status pesanan */
+.status{position:relative;margin:34px 0 0 clamp(0px,2vw,10px);max-width:520px;padding:14px 16px;border:1.5px solid var(--line);border-radius:20px;animation:up .3s ease-out}
+.status p{margin:6px 0 0;font-size:.8rem;line-height:1.45}
+.status .s-note{color:var(--muted);font-size:.76rem}
+.badge{display:inline-block;margin-right:8px;padding:3px 10px;border-radius:99px;background:var(--brand);color:var(--on-brand);font-size:.72rem;font-weight:700}
+.AWAITING_PAYMENT .badge{background:#d9a21b;color:#2b1a05}
+.link{margin-top:8px;padding:2px 0;border:0;background:none;font-size:.78rem;font-weight:600;text-decoration:underline;cursor:pointer}
+@keyframes up{from{transform:translateY(24px);opacity:0}}
+@keyframes fade{from{opacity:0}}
+.toast{position:fixed;z-index:60;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);max-width:calc(100% - 32px);background:var(--toast);color:var(--toast-ink);padding:12px 18px;border-radius:12px;font-size:.85rem;font-weight:500;box-shadow:0 8px 24px rgba(0,0,0,.3);text-align:center}
+.t-enter-active,.t-leave-active{transition:opacity .25s,transform .25s}.t-enter-from,.t-leave-to{opacity:0;transform:translate(-50%,10px)}
+@media(prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script src="https://cdn.jsdelivr.net/npm/vue@3.4.21/dist/vue.global.prod.js"></script>
+<script>
+const { createApp, ref, reactive, watch, nextTick, computed, onMounted, onBeforeUnmount } = Vue;
+const rp = n => 'Rp ' + n.toLocaleString('id-ID');
+
+/* ---------- data (src/data/menu.js) ---------- */
+const DEFAULT_MENU = [
+  { id:1, type:'Makanan', cat:'Nasi',  name:'Nasi Goreng Kampung', price:28000 },
+  { id:2, type:'Makanan', cat:'Ayam',  name:'Ayam Bakar Madu',     price:34000 },
+  { id:3, type:'Makanan', cat:'Kuah',  name:'Soto Ayam Lamongan',  price:26000 },
+  { id:4, type:'Makanan', cat:'Sayur', name:'Gado-Gado',           price:22000 },
+  { id:5, type:'Makanan', cat:'Nasi',  name:'Nasi Liwet Komplit',  price:32000 },
+  { id:6, type:'Makanan', cat:'Ayam',  name:'Ayam Penyet Sambal',  price:30000 },
+  { id:7, type:'Minuman', cat:'Dingin',name:'Es Teh Manis',        price:6000 },
+  { id:8, type:'Minuman', cat:'Dingin',name:'Es Jeruk Peras',      price:10000 },
+  { id:9, type:'Minuman', cat:'Panas', name:'Kopi Tubruk',         price:12000 },
+  { id:10,type:'Minuman', cat:'Panas', name:'Wedang Jahe',         price:9000 },
+];
+
+/* ---------- store bersama pembeli & penjual (src/stores/shop.js) ---------- */
+/* Disimpan di localStorage + sinkron antar tab. Ganti load/save dengan API backend untuk lintas perangkat. */
+const KEY = 'wwh-store-v1';
+const store = reactive({ menu: DEFAULT_MENU.map(m => ({ ...m, available:true })), orders: [] });
+let syncing = false;
+function load(){
+  try{
+    const d = JSON.parse(localStorage.getItem(KEY) || 'null');
+    if(d && Array.isArray(d.menu)) store.menu = d.menu;
+    if(d && Array.isArray(d.orders)) store.orders = d.orders;
+  }catch(e){}
+}
+function save(){ try{ localStorage.setItem(KEY, JSON.stringify({ menu:store.menu, orders:store.orders })); }catch(e){} }
+load();
+watch(() => [store.menu, store.orders], () => { if(!syncing) save(); }, { deep:true });
+window.addEventListener('storage', e => { if(e.key === KEY){ syncing = true; load(); nextTick(() => { syncing = false; }); } });
+const Orders = {
+  create(o){ store.orders.unshift(o); },
+  update(id, patch){ const o = store.orders.find(x => x.id === id); if(o) Object.assign(o, patch); },
+};
+const fmtDate = t => t ? new Date(t).toLocaleString('id-ID', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' }) : '-';
+const methodLabel = m => m === 'qris' ? 'QRIS' : 'Tunai';
+
+/* ---------- components ---------- */
+const AppHeader = {
+  props:{ seller:Boolean },
+  template:`<header><div class="top"><div class="logo">Logo</div><h1 class="brand">Warung Wak Haji</h1></div>
+  <div class="hero"><template v-if="seller"><h2>Dashboard Penjual</h2><p>Kelola pesanan, riwayat, dan menu<br>Warung Wak Haji dalam satu tempat</p></template><template v-else><h2>Welcome To Our Restaurant</h2><p>Sajian Lezat Dengan Cita Rasa Istimewa<br>Siap Menemani Setiap Momenmu</p></template></div></header>`
+};
+
+const FilterDropdown = {
+  props:{ modelValue:String, options:Array, solid:Boolean, label:String },
+  emits:['update:modelValue'],
+  setup(props, { emit }){
+    const open = ref(false), root = ref(null);
+    const close = e => { if(root.value && !root.value.contains(e.target)) open.value = false; };
+    const key = e => { if(e.key === 'Escape') open.value = false; };
+    onMounted(()=>{ document.addEventListener('click', close); document.addEventListener('keydown', key); });
+    onBeforeUnmount(()=>{ document.removeEventListener('click', close); document.removeEventListener('keydown', key); });
+    const pick = o => { emit('update:modelValue', o); open.value = false; };
+    return { open, root, pick };
+  },
+  template:`<div class="dd" :class="{open}" ref="root">
+    <button class="dd-btn" :class="{solid}" type="button" aria-haspopup="listbox" :aria-expanded="open" @click="open=!open">
+      {{ modelValue === 'Semua' ? label : modelValue }}<i class="caret"></i></button>
+    <ul v-if="open" class="dd-menu" role="listbox">
+      <li v-for="o in options" :key="o" role="option" :class="{on:o===modelValue}" :aria-selected="o===modelValue" @click="pick(o)">{{ o }}</li>
+    </ul></div>`
+};
+
+const MenuCard = {
+  props:{ item:Object, qty:Number },
+  emits:['add','remove'],
+  methods:{ rp },
+  template:`<article class="card">
+    <div class="thumb" aria-hidden="true"><svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><circle cx="32" cy="36" r="18"/><circle cx="32" cy="36" r="10"/><path d="M8 8v16M13 8v16M8 16h5M56 8c-5 3-6 10-6 16h6z"/></svg></div>
+    <h3 class="name">{{ item.name }}</h3>
+    <p class="price">{{ rp(item.price) }}</p>
+    <button v-if="item.available === false" class="pesan" type="button" disabled>HABIS</button>
+    <button v-else-if="!qty" class="pesan" type="button" @click="$emit('add', item)">PESAN</button>
+    <div v-else class="step"><button type="button" aria-label="Kurangi" @click="$emit('remove', item)">−</button><span>{{ qty }}</span><button type="button" aria-label="Tambah" @click="$emit('add', item)">+</button></div>
+  </article>`
+};
+
+/* ---------- pembayaran (src/services/payment.js) ---------- */
+const PAYMENTS = [
+  { id:'qris', label:'QRIS', desc:'Scan dengan e-wallet atau m-banking',
+    icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3zM20 14v.01M14 20h3M20 17v4"/></svg>' },
+  { id:'cash', label:'Cash (Tunai)', desc:'Bayar langsung ke kasir',
+    icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><path d="M6 10v.01M18 14v.01"/></svg>' },
+];
+const STATUS = {
+  AWAITING_PAYMENT:{ label:'Menunggu Pembayaran', note:'Pembayaran QRIS belum diverifikasi. Status akan berubah setelah kasir memastikan dana masuk.' },
+  PLACED:{ label:'Pesanan Dibuat', note:'Pembayaran dilakukan secara tunai langsung kepada kasir atau petugas.' },
+  PREPARING:{ label:'Sedang Diproses', note:'Pesanan Anda sedang disiapkan oleh dapur.' },
+  READY:{ label:'Siap Disajikan', note:'Pesanan siap dan segera diantar ke meja Anda.' },
+  DONE:{ label:'Selesai', note:'Pesanan selesai. Terima kasih sudah makan di Warung Wak Haji!' },
+  CANCELLED:{ label:'Dibatalkan', note:'Pesanan dibatalkan oleh penjual. Silakan hubungi kasir.' },
+};
+/* Titik integrasi: ganti isi createOrder dengan panggilan API / payment gateway sungguhan. */
+const PaymentService = {
+  async createOrder(draft){
+    await new Promise(r => setTimeout(r, 450)); // simulasi jaringan
+    return { ...draft, createdAt:Date.now(), paid:false, id:'WWH-' + Date.now().toString().slice(-5), status: draft.method === 'qris' ? 'AWAITING_PAYMENT' : 'PLACED' };
+  },
+};
+
+const PaymentOptions = {
+  props:{ modelValue:String, error:Boolean },
+  emits:['update:modelValue'],
+  setup(){ return { PAYMENTS }; },
+  template:`<fieldset class="pay"><legend>Metode Pembayaran:</legend>
+    <div class="pay-grid" role="radiogroup">
+      <label v-for="p in PAYMENTS" :key="p.id" class="opt" :class="{on:modelValue===p.id}">
+        <input type="radio" name="pay" :value="p.id" :checked="modelValue===p.id" @change="$emit('update:modelValue', p.id)">
+        <span class="ic" v-html="p.icon"></span><span class="dot"></span>
+        <b>{{ p.label }}</b><small>{{ p.desc }}</small>
+      </label>
+    </div>
+    <p v-if="error" class="msg pay-msg">Pilih metode pembayaran.</p></fieldset>`
+};
+
+const OrderForm = {
+  components:{ PaymentOptions },
+  props:{ count:Number, total:Number, payment:String },
+  emits:['submit','update:payment'],
+  setup(props, { emit }){
+    const nama = ref(''), meja = ref(''), tried = ref(false);
+    const errNama = computed(()=> tried.value && !nama.value.trim());
+    const errMeja = computed(()=> tried.value && !/^\d+$/.test(meja.value.trim()));
+    const errPay = computed(()=> tried.value && !props.payment);
+    const send = () => {
+      tried.value = true;
+      if(errNama.value || errMeja.value || errPay.value) return;
+      emit('submit', { nama:nama.value.trim(), meja:meja.value.trim(), reset:()=>{ nama.value=''; meja.value=''; tried.value=false; } });
+    };
+    return { nama, meja, errNama, errMeja, errPay, send, rp };
+  },
+  template:`<section class="order" aria-label="Data pemesan">
+    <p class="sum">{{ count ? count + ' item dipilih · ' + rp(total) : 'Belum ada menu dipilih' }}</p>
+    <div class="field" :class="{err:errNama}"><label for="nama">Nama Pemesan:</label><input id="nama" v-model="nama" placeholder="masukkan menu..." autocomplete="name" @keyup.enter="send"></div>
+    <p v-if="errNama" class="msg">Nama wajib diisi.</p>
+    <div class="field" :class="{err:errMeja}"><label for="meja">No. Meja:</label><input id="meja" v-model="meja" placeholder="masukkan nomor meja(1-9)" inputmode="numeric" @keyup.enter="send"></div>
+    <p v-if="errMeja" class="msg">Isi dengan nomor meja (angka).</p>
+    <payment-options :model-value="payment" :error="errPay" @update:model-value="v => $emit('update:payment', v)" />
+    <div class="actions"><button class="submit" type="button" @click="send">Submit</button></div>
+  </section>`
+};
+
+/* ---------- modal & status ---------- */
+const BaseModal = {
+  props:{ title:String, bare:Boolean },
+  emits:['close'],
+  setup(_, { emit }){
+    const box = ref(null);
+    const key = e => { if(e.key === 'Escape') emit('close'); };
+    onMounted(()=>{ document.addEventListener('keydown', key); document.body.style.overflow = 'hidden'; box.value && box.value.focus(); });
+    onBeforeUnmount(()=>{ document.removeEventListener('keydown', key); document.body.style.overflow = ''; });
+    return { box };
+  },
+  template:`<div class="ov" @mousedown.self="$emit('close')">
+    <div class="modal" :class="{bare}" role="dialog" aria-modal="true" :aria-label="title" tabindex="-1" ref="box">
+      <template v-if="!bare"><button class="x" type="button" aria-label="Tutup" @click="$emit('close')">×</button>
+      <h3 class="m-title">{{ title }}</h3></template>
+      <slot />
+      <div class="m-foot"><slot name="footer" /></div>
+    </div></div>`
+};
+
+/* QR contoh (dummy) - bukan kode pembayaran sungguhan */
+const QrDummy = {
+  props:{ seed:{ type:String, default:'wwh' } },
+  setup(props){
+    const N = 25;
+    const finders = [[0,0],[N-7,0],[0,N-7]];
+    const path = computed(()=>{
+      let h = 2166136261;
+      for(const c of props.seed){ h = Math.imul(h ^ c.charCodeAt(0), 16777619) >>> 0; }
+      h = h || 1;
+      const rnd = () => { h ^= h << 13; h >>>= 0; h ^= h >>> 17; h ^= h << 5; h >>>= 0; return h / 4294967296; };
+      let d = '';
+      for(let y=0; y<N; y++) for(let x=0; x<N; x++){
+        const f = (x<8 && y<8) || (x>=N-8 && y<8) || (x<8 && y>=N-8);
+        if(!f && rnd() > .52) d += `M${x} ${y}h1v1h-1z`;
+      }
+      return d;
+    });
+    return { finders, path };
+  },
+  template:`<svg viewBox="-2 -2 29 29" role="img" aria-label="QR Code contoh" shape-rendering="crispEdges">
+    <rect x="-2" y="-2" width="29" height="29" fill="#fff"/>
+    <path :d="path" fill="#111"/>
+    <g v-for="f in finders" :key="f.join()"><rect :x="f[0]" :y="f[1]" width="7" height="7" fill="#111"/><rect :x="f[0]+1" :y="f[1]+1" width="5" height="5" fill="#fff"/><rect :x="f[0]+2" :y="f[1]+2" width="3" height="3" fill="#111"/></g>
+  </svg>`
+};
+
+const PaymentModal = {
+  components:{ BaseModal, QrDummy },
+  props:{ method:String, order:Object, busy:Boolean },
+  emits:['confirm','close'],
+  setup(props){ return { rp, seed: computed(()=> props.order.nama + props.order.meja + props.order.total) }; },
+  template:`<base-modal :title="method === 'qris' ? 'Pembayaran QRIS' : 'Konfirmasi Pesanan'" @close="$emit('close')">
+    <template v-if="method === 'qris'">
+      <div class="qr-box"><qr-dummy :seed="seed" /></div>
+      <p class="qr-total">{{ rp(order.total) }}</p>
+      <p class="qr-merch">Merchant: Warung Wak Haji · Meja {{ order.meja }}</p>
+      <ol class="steps">
+        <li>Buka aplikasi e-wallet atau m-banking Anda.</li>
+        <li>Pilih menu <b>Scan / QRIS</b> lalu pindai kode di atas.</li>
+        <li>Pastikan nama merchant dan nominal sudah sesuai.</li>
+        <li>Selesaikan pembayaran, lalu tekan <b>Saya Sudah Bayar</b>.</li>
+      </ol>
+      <p class="note">Prototype: QR ini hanya contoh dan bukan kode pembayaran sungguhan. Pembayaran belum dianggap lunas sebelum diverifikasi.</p>
+    </template>
+    <template v-else>
+      <div class="meta"><div><span>No. Meja</span><b>{{ order.meja }}</b></div><div><span>Pemesan</span><b>{{ order.nama }}</b></div></div>
+      <ul class="lines"><li v-for="l in order.lines" :key="l.id"><span>{{ l.name }} × {{ l.qty }}</span><span>{{ rp(l.subtotal) }}</span></li></ul>
+      <div class="total-row"><span>Total</span><span>{{ rp(order.total) }}</span></div>
+      <p class="note">Pembayaran dilakukan langsung kepada kasir atau petugas setelah pesanan dikonfirmasi.</p>
+    </template>
+    <template #footer>
+      <button class="btn-ghost" type="button" :disabled="busy" @click="$emit('close')">{{ method === 'qris' ? 'Batal' : 'Kembali' }}</button>
+      <button class="btn-main" type="button" :disabled="busy" @click="$emit('confirm')">{{ busy ? 'Memproses…' : (method === 'qris' ? 'Saya Sudah Bayar' : 'Konfirmasi Pesanan') }}</button>
+    </template>
+  </base-modal>`
+};
+
+const OrderStatus = {
+  props:{ order:Object },
+  emits:['dismiss'],
+  setup(props){ return { rp, info: computed(()=> STATUS[props.order.status]) }; },
+  template:`<section class="status" :class="order.status" role="status">
+    <div><span class="badge">{{ info.label }}</span><strong>Pesanan {{ order.id }}</strong></div>
+    <p>Meja {{ order.meja }} · {{ order.count }} item · {{ rp(order.total) }} · {{ order.method === 'qris' ? 'QRIS' : 'Tunai' }}</p>
+    <p class="s-note">{{ info.note }}</p>
+    <button class="link" type="button" @click="$emit('dismiss')">Tutup</button>
+  </section>`
+};
+
+/* ---------- penjual (src/views/seller/*) ---------- */
+const DISH = '<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><circle cx="32" cy="36" r="18"/><circle cx="32" cy="36" r="10"/><path d="M8 8v16M13 8v16M8 16h5M56 8c-5 3-6 10-6 16h6z"/></svg>';
+const FLOW = {
+  AWAITING_PAYMENT:[{ to:'PREPARING', label:'Konfirmasi Bayar', extra:{ paid:true }, main:true }, { to:'CANCELLED', label:'Tolak' }],
+  PLACED:[{ to:'PREPARING', label:'Proses Pesanan', main:true }, { to:'CANCELLED', label:'Batalkan' }],
+  PREPARING:[{ open:true, label:'Buka Pesanan' }, { to:'READY', label:'Siap Disajikan', main:true }],
+  READY:[{ open:true, label:'Buka Pesanan' }, { to:'DONE', label:'Selesai', main:true }],
+};
+
+const RoleSwitch = {
+  props:{ modelValue:String, pending:Number },
+  emits:['update:modelValue'],
+  setup(){ return { ROLES:[{ id:'pembeli', label:'Pembeli' }, { id:'penjual', label:'Penjual' }] }; },
+  template:`<div class="roles" role="tablist" aria-label="Mode tampilan">
+    <button v-for="r in ROLES" :key="r.id" type="button" role="tab" :class="{on:modelValue===r.id}" :aria-selected="modelValue===r.id" @click="$emit('update:modelValue', r.id)">
+      {{ r.label }}<i v-if="r.id==='penjual' && pending" class="cnt">{{ pending }}</i></button></div>`
+};
+
+const OrderDetailModal = {
+  components:{ BaseModal },
+  props:{ order:Object },
+  emits:['close'],
+  setup(props){
+    const typeOf = l => l.type || (store.menu.find(m => m.id === l.id) || {}).type || 'Makanan';
+    const groups = computed(()=> ['Makanan','Minuman'].map(t => ({ label:t.toUpperCase(), items:props.order.lines.filter(l => typeOf(l) === t) })).filter(g => g.items.length));
+    return { groups, rp };
+  },
+  template:`<base-modal bare title="Detail Pesanan" @close="$emit('close')">
+    <div class="dt-head"><p>Nama Pemesan: {{ order.nama }}</p><p>No. Meja: {{ order.meja }}</p></div>
+    <div v-for="(g, i) in groups" :key="g.label" class="dt-grid">
+      <span class="dt-lab">{{ g.label }}</span><span class="dt-lab">{{ i === 0 ? 'QTY' : '' }}</span><span class="dt-lab">{{ i === 0 ? 'HARGA' : '' }}</span>
+      <template v-for="l in g.items" :key="l.id"><span class="dt-name">{{ l.name }}</span><span class="dt-qty">{{ l.qty }}</span><span class="dt-price">{{ rp(l.subtotal) }}</span></template>
+    </div>
+    <div class="dt-total"><span>TOTAL</span><span>{{ rp(order.total) }}</span></div>
+    <template #footer><button class="dt-close" type="button" @click="$emit('close')">TUTUP</button></template>
+  </base-modal>`
+};
+
+const SellerOrders = {
+  components:{ OrderDetailModal },
+  emits:['toast'],
+  setup(_, { emit }){
+    const list = computed(()=> store.orders.filter(o => FLOW[o.status]).sort((a,b) => a.createdAt - b.createdAt));
+    const detailId = ref(null);
+    const detail = computed(()=> store.orders.find(o => o.id === detailId.value) || null);
+    const label = (o, a) => (a.to === 'DONE' && !o.paid) ? 'Terima Tunai & Selesai' : a.label;
+    const act = (o, a) => {
+      if(a.open){ detailId.value = o.id; return; }
+      const patch = { status:a.to, ...(a.extra || {}) };
+      if(a.to === 'DONE'){ patch.paid = true; patch.doneAt = Date.now(); }
+      if(a.to === 'CANCELLED') patch.doneAt = Date.now();
+      Orders.update(o.id, patch);
+      emit('toast', `Pesanan ${o.id}: ${STATUS[a.to].label}`);
+    };
+    return { list, STATUS, FLOW, label, act, detail, detailId, rp, fmtDate, methodLabel };
+  },
+  template:`<section aria-label="Pemesanan masuk">
+    <div v-if="list.length" class="og">
+      <article v-for="o in list" :key="o.id" class="card oc" :class="o.status">
+        <div class="oc-head"><div><h3 class="name oc-meja">Meja {{ o.meja }}</h3><p class="oc-sub">{{ o.nama }} · {{ fmtDate(o.createdAt) }} · {{ o.id }}</p></div><span class="badge">{{ STATUS[o.status].label }}</span></div>
+        
+        <div class="total-row"><span>{{ o.count }} item · {{ methodLabel(o.method) }} · {{ o.paid ? 'Lunas' : 'Belum bayar' }}</span><span>{{ rp(o.total) }}</span></div>
+        <div class="oc-actions"><button v-for="a in FLOW[o.status]" :key="a.to || 'open'" type="button" class="act" :class="{main:a.main}" @click="act(o, a)">{{ label(o, a) }}</button></div>
+      </article>
+    </div>
+    <p v-else class="empty">Belum ada pesanan masuk. Pesanan dari halaman pembeli akan muncul di sini.</p>
+    <order-detail-modal v-if="detail" :order="detail" @close="detailId = null" /></section>`
+};
+
+const SellerHistory = {
+  setup(){
+    const done = computed(()=> store.orders.filter(o => o.status === 'DONE' || o.status === 'CANCELLED').sort((a,b) => (b.doneAt||0) - (a.doneAt||0)));
+    const finished = computed(()=> done.value.filter(o => o.status === 'DONE'));
+    const revenue = computed(()=> finished.value.reduce((s,o) => s + o.total, 0));
+    const sure = ref(false);
+    const clear = () => {
+      if(!sure.value){ sure.value = true; setTimeout(()=> sure.value = false, 3000); return; }
+      store.orders = store.orders.filter(o => o.status !== 'DONE' && o.status !== 'CANCELLED'); sure.value = false;
+    };
+    return { done, finished, revenue, sure, clear, rp, fmtDate, methodLabel, STATUS };
+  },
+  template:`<section aria-label="Riwayat pesanan">
+    <div class="stats">
+      <div class="stat wide"><span>Total Pendapatan</span><b>{{ rp(revenue) }}</b></div>
+      <div class="stat"><span>Selesai</span><b>{{ finished.length }}</b></div>
+      <div class="stat"><span>Dibatalkan</span><b>{{ done.length - finished.length }}</b></div>
+    </div>
+    <div v-if="done.length">
+      <div class="hist-top"><strong style="font-size:.9rem">Riwayat Pesanan</strong><button class="link" type="button" style="margin:0" @click="clear">{{ sure ? 'Yakin hapus semua?' : 'Hapus riwayat' }}</button></div>
+      <ul class="hist"><li v-for="o in done" :key="o.id" :class="o.status">
+        <div class="h-main"><b>Meja {{ o.meja }} · {{ o.nama }}</b><p>{{ o.lines.map(l => l.name + ' ×' + l.qty).join(', ') }}</p><p>{{ o.id }} · {{ fmtDate(o.doneAt) }} · {{ methodLabel(o.method) }}</p></div>
+        <div class="h-side"><b>{{ rp(o.total) }}</b><span class="badge">{{ STATUS[o.status].label }}</span></div></li></ul>
+    </div>
+    <p v-else class="empty">Belum ada riwayat. Pesanan yang selesai atau dibatalkan tercatat di sini.</p></section>`
+};
+
+const MenuEditor = {
+  components:{ FilterDropdown, BaseModal },
+  emits:['toast'],
+  setup(_, { emit }){
+    const filter = ref('Semua'), catFilter = ref('Semua'), draft = ref(null), err = ref(''), delId = ref(null);
+    const byType = computed(()=> store.menu.filter(m => filter.value === 'Semua' || m.type === filter.value));
+    const cats = computed(()=> ['Semua', ...new Set(byType.value.map(m => m.cat))]);
+    const allCats = computed(()=> [...new Set(store.menu.map(m => m.cat))]);
+    const list = computed(()=> byType.value.filter(m => catFilter.value === 'Semua' || m.cat === catFilter.value));
+    watch(cats, c => { if(!c.includes(catFilter.value)) catFilter.value = 'Semua'; });
+    const open = m => { err.value = ''; draft.value = m ? { ...m } : { id:0, name:'', price:'', type:'Makanan', cat:'', available:true }; };
+    const save = () => {
+      const d = draft.value, price = Math.round(Number(String(d.price).replace(/\D/g, '')));
+      if(!d.name.trim()){ err.value = 'Nama menu wajib diisi.'; return; }
+      if(!(price > 0)){ err.value = 'Harga harus berupa angka lebih dari 0.'; return; }
+      const rec = { ...d, name:d.name.trim(), cat:(d.cat || '').trim() || 'Umum', price };
+      if(d.id){ const i = store.menu.findIndex(m => m.id === d.id); if(i > -1) store.menu[i] = rec; }
+      else { rec.id = Math.max(0, ...store.menu.map(m => m.id)) + 1; store.menu.push(rec); }
+      emit('toast', `Menu "${rec.name}" disimpan dan langsung tampil di halaman pembeli.`);
+      draft.value = null;
+    };
+    const toggle = m => { m.available = m.available === false; };
+    const del = m => {
+      if(delId.value !== m.id){ delId.value = m.id; setTimeout(()=> { if(delId.value === m.id) delId.value = null; }, 3000); return; }
+      store.menu = store.menu.filter(x => x.id !== m.id); delId.value = null; emit('toast', `Menu "${m.name}" dihapus.`);
+    };
+    return { filter, catFilter, cats, allCats, draft, err, delId, list, open, save, toggle, del, rp, DISH };
+  },
+  template:`<section aria-label="Edit menu">
+    <div class="ed-bar"><div class="ed-filters"><filter-dropdown v-model="filter" :options="['Semua','Makanan','Minuman']" label="Semua menu" solid /><filter-dropdown v-model="catFilter" :options="cats" label="Kategori" /></div><button class="submit" type="button" @click="open()">+ Tambah Menu</button></div>
+    <div class="grid">
+      <article v-for="m in list" :key="m.id" class="card" :class="{off:m.available === false}">
+        <div class="thumb" aria-hidden="true" v-html="DISH"></div>
+        <h3 class="name">{{ m.name }}</h3>
+        <p class="price">{{ rp(m.price) }}</p>
+        <p class="cat">{{ m.type }} · {{ m.cat }}</p>
+        <button class="sw" type="button" role="switch" :aria-checked="m.available !== false" @click="toggle(m)"><i></i><span>{{ m.available !== false ? 'Tersedia' : 'Habis' }}</span></button>
+        <div class="oc-actions"><button class="act main" type="button" @click="open(m)">Edit</button><button class="act" type="button" @click="del(m)">{{ delId === m.id ? 'Yakin?' : 'Hapus' }}</button></div>
+      </article>
+      <p v-if="!list.length" class="empty">Belum ada menu.</p>
+    </div>
+    <base-modal v-if="draft" :title="draft.id ? 'Edit Menu' : 'Tambah Menu'" @close="draft = null">
+      <div class="mf"><label for="f-name">Nama menu</label><input id="f-name" v-model="draft.name" maxlength="40" placeholder="Typing.."></div>
+      <div class="mf"><label for="f-price">Harga (Rp)</label><input id="f-price" v-model="draft.price" inputmode="numeric" placeholder="Typing.."></div>
+      <div class="mf"><span>Jenis</span><div class="chips"><button v-for="t in ['Makanan','Minuman']" :key="t" type="button" class="chip" :class="{on:draft.type === t}" @click="draft.type = t">{{ t }}</button></div></div>
+      <div class="mf"><label for="f-cat">Kategori</label><input id="f-cat" v-model="draft.cat" list="cat-list" maxlength="20" placeholder="mis. Nasi, Ayam"><datalist id="cat-list"><option v-for="c in allCats" :key="c" :value="c"></option></datalist></div>
+      <p v-if="err" class="msg" style="margin:0">{{ err }}</p>
+      <template #footer><button class="btn-ghost" type="button" @click="draft = null">Batal</button><button class="btn-main" type="button" @click="save">Simpan</button></template>
+    </base-modal></section>`
+};
+
+const TAB_ICONS = {
+  orders:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6"/></svg>',
+  history:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l3 2"/></svg>',
+  edit:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/></svg>',
+};
+const SellerApp = {
+  components:{ AppHeader, SellerOrders, SellerHistory, MenuEditor },
+  emits:['toast'],
+  setup(){
+    const tab = ref('orders');
+    const tabs = computed(()=> [
+      { id:'orders', label:'Pemesanan', icon:TAB_ICONS.orders, n: store.orders.filter(o => FLOW[o.status]).length },
+      { id:'history', label:'History', icon:TAB_ICONS.history },
+      { id:'edit', label:'Edit', icon:TAB_ICONS.edit },
+    ]);
+    return { tab, tabs };
+  },
+  template:`<div>
+    <app-header seller />
+    <nav class="snav" role="tablist" aria-label="Menu penjual">
+      <button v-for="t in tabs" :key="t.id" type="button" role="tab" :class="{on:tab === t.id}" :aria-selected="tab === t.id" @click="tab = t.id">
+        <span class="ni" v-html="t.icon"></span><span>{{ t.label }}</span><i v-if="t.n" class="cnt">{{ t.n }}</i>
+      </button>
+    </nav>
+    <seller-orders v-if="tab === 'orders'" @toast="$emit('toast', $event)" />
+    <seller-history v-else-if="tab === 'history'" />
+    <menu-editor v-else @toast="$emit('toast', $event)" />
+    <div class="snav-space" aria-hidden="true"></div>
+  </div>`
+};
+
+/* ---------- root ---------- */
+createApp({
+  components:{ AppHeader, FilterDropdown, MenuCard, OrderForm, PaymentModal, OrderStatus, RoleSwitch, SellerApp },
+  setup(){
+    const type = ref('Makanan'), cat = ref('Semua'), cart = ref({}), toast = ref('');
+    let timer;
+    const types = ['Makanan','Minuman'];
+    const cats = computed(()=> ['Semua', ...new Set(store.menu.filter(m=>m.type===type.value).map(m=>m.cat))]);
+    const items = computed(()=> store.menu.filter(m=> m.type===type.value && (cat.value==='Semua' || m.cat===cat.value)));
+    const add = i => { cart.value = { ...cart.value, [i.id]:(cart.value[i.id]||0)+1 }; };
+    const remove = i => { const c = { ...cart.value }; if(c[i.id]>1) c[i.id]--; else delete c[i.id]; cart.value = c; };
+    const count = computed(()=> Object.values(cart.value).reduce((a,b)=>a+b,0));
+    const total = computed(()=> store.menu.reduce((s,m)=> s + (cart.value[m.id]||0)*m.price, 0));
+    const say = t => { toast.value = t; clearTimeout(timer); timer = setTimeout(()=> toast.value='', 3600); };
+    const payment = ref(null), draft = ref(null), resetForm = ref(null), busy = ref(false), myOrderId = ref(null), role = ref('pembeli');
+    const order = computed(()=> store.orders.find(o => o.id === myOrderId.value) || null);
+    const pendingCount = computed(()=> store.orders.filter(o => FLOW[o.status]).length);
+    const lines = computed(()=> store.menu.filter(m => cart.value[m.id]).map(m => ({ id:m.id, type:m.type, name:m.name, qty:cart.value[m.id], subtotal:m.price * cart.value[m.id] })));
+    const submit = o => {
+      if(!count.value){ say('Pilih minimal satu menu dulu ya.'); return; }
+      draft.value = { nama:o.nama, meja:o.meja, method:payment.value, lines:lines.value, total:total.value, count:count.value };
+      resetForm.value = o.reset;
+    };
+    const closeModal = () => { if(!busy.value) draft.value = null; }; // data form & keranjang tetap tersimpan
+    const confirm = async () => {
+      busy.value = true;
+      try {
+        const created = await PaymentService.createOrder(draft.value);
+        Orders.create(created); myOrderId.value = created.id; draft.value = null; cart.value = {}; payment.value = null;
+        resetForm.value && resetForm.value();
+        say(created.method === 'cash'
+          ? `Pesanan berhasil dibuat! Pembayaran tunai dilakukan langsung ke kasir untuk meja ${created.meja}.`
+          : 'Menunggu pembayaran. Kasir akan memverifikasi pembayaran QRIS Anda.');
+      } catch(e){ say('Terjadi kendala. Silakan coba lagi.'); }
+      finally { busy.value = false; }
+    };
+    return { type, cat, types, cats, items, cart, add, remove, count, total, submit, toast, payment, draft, busy, order, myOrderId, role, pendingCount, say, confirm, closeModal, onType:v=>{ type.value=v; cat.value='Semua'; } };
+  },
+  template:`<main class="wrap">
+    <role-switch v-model="role" :pending="pendingCount" />
+    <seller-app v-if="role === 'penjual'" @toast="say" />
+    <template v-else>
+    <app-header />
+    <div class="filters">
+      <filter-dropdown :model-value="type" @update:model-value="onType" :options="types" label="Makanan" solid />
+      <filter-dropdown v-model="cat" :options="cats" label="Kategori" />
+    </div>
+    <div class="grid">
+      <menu-card v-for="m in items" :key="m.id" :item="m" :qty="cart[m.id]||0" @add="add" @remove="remove" />
+      <p v-if="!items.length" class="empty">Menu belum tersedia.</p>
+    </div>
+    <order-status v-if="order" :order="order" @dismiss="myOrderId = null" />
+    <order-form v-model:payment="payment" :count="count" :total="total" @submit="submit" />
+    <payment-modal v-if="draft" :method="draft.method" :order="draft" :busy="busy" @confirm="confirm" @close="closeModal" />
+    </template>
+    <transition name="t"><div v-if="toast" class="toast" :class="{lift:role === 'penjual'}" role="status">{{ toast }}</div></transition>
+  </main>`
+}).mount('#app');
+</script>
+</body>
+</html>

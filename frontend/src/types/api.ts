@@ -6,6 +6,8 @@ export interface MenuResponse {
   description: string | null
   price: string // Decimal serialised as string
   image_url: string | null
+  menu_type: string  // 'Makanan' | 'Minuman'
+  category: string
   is_available: boolean
   is_active: boolean
   created_at: string
@@ -17,6 +19,8 @@ export interface MenuCreate {
   description?: string | null
   price: number
   image_url?: string | null
+  menu_type?: string
+  category?: string
   is_available?: boolean
   is_active?: boolean
 }
@@ -26,6 +30,8 @@ export interface MenuUpdate {
   description?: string | null
   price?: number | null
   image_url?: string | null
+  menu_type?: string | null
+  category?: string | null
   is_available?: boolean | null
   is_active?: boolean | null
 }
@@ -47,6 +53,8 @@ export interface OrderItemInput {
 
 export interface OrderCreateRequest {
   buyer_name: string
+  table_number: string
+  payment_method: 'qris' | 'cash'
   items: OrderItemInput[]
   notes?: string | null
 }
@@ -66,16 +74,21 @@ export interface OrderDuplicateResponse {
   total_amount: string
 }
 
+/** Snapshot of one item as stored in order_items row */
 export interface OrderItemSnapshot {
-  menu_name: string
-  menu_price: string
+  menu_name_snapshot: string
+  menu_type_snapshot: string
+  menu_price_snapshot: string
   quantity: number
   subtotal: string
+  menu_id: string | null
 }
 
 export interface OrderTrackResponse {
   order_number: string
   buyer_name: string
+  table_number: string
+  payment_method: string
   order_status: string
   payment_status: string
   total_amount: string
@@ -85,16 +98,13 @@ export interface OrderTrackResponse {
   updated_at: string
 }
 
-export interface ProofUploadResponse {
-  message: string
-  payment_status: string
-}
-
 // ─── Orders (seller) ────────────────────────────────────────────────────────
 
 export interface OrderListItem {
   order_number: string
   buyer_name: string
+  table_number: string
+  payment_method: string
   order_status: string
   payment_status: string
   total_amount: string
@@ -102,10 +112,11 @@ export interface OrderListItem {
   created_at: string
 }
 
+/** Item detail as returned by seller order endpoints */
 export interface OrderItemDetail {
-  menu_name: string
-  menu_price: string
-  quantity: number
+  menu_type: string
+  name: string
+  qty: number
   subtotal: string
   menu_id: string | null
 }
@@ -113,14 +124,14 @@ export interface OrderItemDetail {
 export interface OrderDetailResponse {
   order_number: string
   buyer_name: string
+  table_number: string
+  payment_method: string
   notes: string | null
   order_status: string
   payment_status: string
   total_amount: string
   items: OrderItemDetail[]
-  payment_proof_url: string | null
   cancel_reason: string | null
-  reject_reason: string | null
   created_at: string
   updated_at: string
 }
@@ -128,12 +139,13 @@ export interface OrderDetailResponse {
 export interface HistoryItem {
   order_number: string
   buyer_name: string
+  table_number: string
+  payment_method: string
   order_status: string
   payment_status: string
   total_amount: string
   items: OrderItemDetail[]
   cancel_reason: string | null
-  reject_reason: string | null
   created_at: string
 }
 
@@ -142,6 +154,9 @@ export interface HistoryResponse {
   total: number
   page: number
   page_size: number
+  total_revenue: string
+  completed_count: number
+  cancelled_count: number
 }
 
 export interface HistoryParams {

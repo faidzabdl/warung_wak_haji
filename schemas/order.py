@@ -1,3 +1,4 @@
+import re
 from decimal import Decimal
 
 from pydantic import BaseModel, ConfigDict, field_validator
@@ -17,8 +18,13 @@ class OrderItemInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
+_TABLE_NUMBER_RE = re.compile(r"^\d{1,4}$")
+
+
 class OrderCreateRequest(BaseModel):
     buyer_name: str
+    table_number: str
+    payment_method: str
     items: list[OrderItemInput]
     notes: str | None = None
 
@@ -28,6 +34,21 @@ class OrderCreateRequest(BaseModel):
         v = v.strip()
         if not v:
             raise ValueError("buyer_name cannot be empty")
+        return v
+
+    @field_validator("table_number")
+    @classmethod
+    def table_number_valid(cls, v: str) -> str:
+        v = v.strip()
+        if not _TABLE_NUMBER_RE.match(v):
+            raise ValueError("table_number must be 1–4 digits (e.g. '1', '12', '99')")
+        return v
+
+    @field_validator("payment_method")
+    @classmethod
+    def payment_method_valid(cls, v: str) -> str:
+        if v not in ("qris", "cash"):
+            raise ValueError("payment_method must be 'qris' or 'cash'")
         return v
 
     @field_validator("items")
@@ -50,6 +71,7 @@ class OrderCreateResponse(BaseModel):
 class OrderItemSnapshot(BaseModel):
     menu_name: str
     menu_price: Decimal
+    menu_type: str
     quantity: int
     subtotal: Decimal
 
@@ -57,6 +79,8 @@ class OrderItemSnapshot(BaseModel):
 class OrderTrackResponse(BaseModel):
     order_number: str
     buyer_name: str
+    table_number: str
+    payment_method: str
     order_status: str
     payment_status: str
     total_amount: Decimal
@@ -64,8 +88,3 @@ class OrderTrackResponse(BaseModel):
     notes: str | None
     created_at: str
     updated_at: str
-
-
-class ProofUploadResponse(BaseModel):
-    message: str
-    payment_status: str

@@ -1,14 +1,20 @@
 <template>
-  <div>
-    <h1 class="text-xl font-bold mb-6">Riwayat Pesanan</h1>
+  <section aria-label="Riwayat pesanan">
+    <!-- Summary stats -->
+    <div class="stats">
+      <div class="stat wide"><span>Total Pendapatan</span><b>{{ rp(result.total_revenue) }}</b></div>
+      <div class="stat"><span>Selesai</span><b>{{ result.completed_count }}</b></div>
+      <div class="stat"><span>Dibatalkan</span><b>{{ result.cancelled_count }}</b></div>
+    </div>
 
     <!-- Filters -->
-    <div class="flex flex-wrap gap-3 mb-6">
+    <div style="display:flex;flex-wrap:wrap;gap:14px;margin-bottom:18px;align-items:flex-end">
       <div>
-        <Label class="text-xs">Status</Label>
+        <label style="font-size:.76rem;font-weight:600;display:block;margin-bottom:4px">Status</label>
         <select
           v-model="filters.status"
-          class="block mt-1 border rounded px-2 py-1.5 text-sm bg-white"
+          class="dd-btn"
+          style="min-width:120px;height:36px"
           @change="goPage(1)"
         >
           <option value="">Semua</option>
@@ -17,103 +23,89 @@
         </select>
       </div>
       <div>
-        <Label class="text-xs">Dari Tanggal</Label>
-        <Input type="date" v-model="filters.date_from" class="mt-1 text-sm" @change="goPage(1)" />
+        <label style="font-size:.76rem;font-weight:600;display:block;margin-bottom:4px">Dari</label>
+        <input
+          type="date"
+          v-model="filters.date_from"
+          class="dd-btn"
+          style="height:36px"
+          @change="goPage(1)"
+        />
       </div>
       <div>
-        <Label class="text-xs">Sampai Tanggal</Label>
-        <Input type="date" v-model="filters.date_to" class="mt-1 text-sm" @change="goPage(1)" />
+        <label style="font-size:.76rem;font-weight:600;display:block;margin-bottom:4px">Sampai</label>
+        <input
+          type="date"
+          v-model="filters.date_to"
+          class="dd-btn"
+          style="height:36px"
+          @change="goPage(1)"
+        />
       </div>
-      <div class="flex items-end">
-        <Button variant="outline" size="sm" @click="resetFilters">Reset</Button>
-      </div>
+      <button class="act" type="button" style="height:36px;flex:none" @click="resetFilters">Reset</button>
     </div>
 
     <!-- Loading -->
-    <div v-if="loading">
-      <Skeleton v-for="i in 5" :key="i" class="h-12 rounded mb-2" />
+    <div v-if="loading" class="hist" style="gap:12px">
+      <li v-for="i in 5" :key="i" style="min-height:60px;opacity:.4;border-radius:20px;border:1.5px solid var(--line);background:var(--card)"></li>
     </div>
 
-    <div v-else-if="error" class="text-destructive text-sm">{{ error }}</div>
+    <p v-else-if="error" class="empty" style="color:var(--line)">{{ error }}</p>
 
-    <div v-else>
-      <div v-if="result.data.length === 0" class="text-muted-foreground text-center py-12">
-        Tidak ada riwayat pesanan.
-      </div>
+    <template v-else>
+      <p v-if="result.data.length === 0" class="empty">Belum ada riwayat pesanan.</p>
 
-      <div v-else class="border rounded-lg overflow-hidden mb-4">
-        <table class="w-full text-sm">
-          <thead class="bg-muted/40">
-            <tr>
-              <th class="text-left px-3 py-2">No. Pesanan</th>
-              <th class="text-left px-3 py-2">Pembeli</th>
-              <th class="text-left px-3 py-2">Status</th>
-              <th class="text-left px-3 py-2">Pembayaran</th>
-              <th class="text-left px-3 py-2">Total</th>
-              <th class="text-left px-3 py-2">Waktu</th>
-              <th class="text-left px-3 py-2">Alasan</th>
-            </tr>
-          </thead>
-          <tbody>
-            <template v-for="order in result.data" :key="order.order_number">
-              <tr
-                class="border-t hover:bg-muted/20 cursor-pointer"
-                @click="expanded = expanded === order.order_number ? null : order.order_number"
-              >
-                <td class="px-3 py-3 font-mono font-medium">{{ order.order_number }}</td>
-                <td class="px-3 py-3">{{ order.buyer_name }}</td>
-                <td class="px-3 py-3"><StatusBadge :status="order.order_status" type="order" /></td>
-                <td class="px-3 py-3"><StatusBadge :status="order.payment_status" type="payment" /></td>
-                <td class="px-3 py-3">{{ formatRupiah(order.total_amount) }}</td>
-                <td class="px-3 py-3 text-muted-foreground text-xs">{{ formatDate(order.created_at) }}</td>
-                <td class="px-3 py-3 text-xs text-muted-foreground">
-                  {{ order.cancel_reason || order.reject_reason || '—' }}
-                </td>
-              </tr>
-              <!-- Expanded items row -->
-              <tr v-if="expanded === order.order_number" class="bg-muted/10">
-                <td colspan="7" class="px-4 py-3">
-                  <p class="text-xs font-semibold mb-2">Item Pesanan:</p>
-                  <div class="space-y-1">
-                    <div
-                      v-for="(item, i) in order.items"
-                      :key="i"
-                      class="flex justify-between text-xs"
-                    >
-                      <span>{{ item.menu_name }} × {{ item.quantity }}</span>
-                      <span>{{ formatRupiah(item.subtotal) }}</span>
-                    </div>
-                  </div>
-                </td>
-              </tr>
-            </template>
-          </tbody>
-        </table>
-      </div>
-
-      <!-- Pagination -->
-      <div class="flex items-center justify-between text-sm">
-        <span class="text-muted-foreground">
-          {{ result.total }} pesanan
-        </span>
-        <div class="flex gap-2">
-          <Button variant="outline" size="sm" :disabled="page === 1" @click="goPage(page - 1)">
-            ← Sebelumnya
-          </Button>
-          <span class="px-2 py-1 text-sm">Hal. {{ page }}</span>
-          <Button
-            variant="outline"
-            size="sm"
-            :disabled="page * pageSize >= result.total"
-            @click="goPage(page + 1)"
-          >
-            Berikutnya →
-          </Button>
+      <template v-else>
+        <!-- History list -->
+        <div class="hist-top">
+          <strong style="font-size:.9rem">Riwayat Pesanan ({{ result.total }})</strong>
         </div>
-      </div>
-    </div>
-    <Toaster />
-  </div>
+        <ul class="hist">
+          <li
+            v-for="o in result.data"
+            :key="o.order_number"
+            :class="o.order_status"
+            style="cursor:pointer"
+            @click="expanded = expanded === o.order_number ? null : o.order_number"
+          >
+            <div class="h-main">
+              <b>Meja {{ o.table_number }} · {{ o.buyer_name }}</b>
+              <p>{{ o.items.map(i => i.name + ' ×' + i.qty).join(', ') }}</p>
+              <p>{{ o.order_number }} · {{ fmtDate(o.created_at) }} · {{ o.payment_method === 'qris' ? 'QRIS' : 'Tunai' }}</p>
+              <!-- Expanded detail -->
+              <div v-if="expanded === o.order_number" style="margin-top:8px;padding-top:8px;border-top:1px dashed var(--wwh-muted)">
+                <div
+                  v-for="(item, i) in o.items"
+                  :key="i"
+                  style="display:flex;justify-content:space-between;font-size:.75rem;padding:2px 0"
+                >
+                  <span>{{ item.name }} × {{ item.qty }}</span>
+                  <span>{{ rp(item.subtotal) }}</span>
+                </div>
+                <p v-if="o.cancel_reason" style="font-size:.72rem;color:var(--line);margin-top:4px">
+                  Alasan: {{ o.cancel_reason }}
+                </p>
+              </div>
+            </div>
+            <div class="h-side">
+              <b>{{ rp(o.total_amount) }}</b>
+              <span class="badge">{{ STATUS_LABEL[o.order_status] ?? o.order_status }}</span>
+            </div>
+          </li>
+        </ul>
+
+        <!-- Pagination -->
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:14px;font-size:.82rem">
+          <span style="color:var(--wwh-muted)">{{ result.total }} pesanan</span>
+          <div style="display:flex;gap:8px">
+            <button class="act" type="button" :disabled="page === 1" @click="goPage(page - 1)">← Sebelumnya</button>
+            <span style="padding:6px 8px">Hal. {{ page }}</span>
+            <button class="act" type="button" :disabled="page * pageSize >= result.total" @click="goPage(page + 1)">Berikutnya →</button>
+          </div>
+        </div>
+      </template>
+    </template>
+  </section>
 </template>
 
 <script setup lang="ts">
@@ -121,25 +113,35 @@ import { ref, computed, onMounted, reactive } from 'vue'
 import { getHistory } from '@/lib/api'
 import { ApiError, type HistoryResponse } from '@/types/api'
 import { useAuthStore } from '@/stores/auth'
-import { formatRupiah, formatDate } from '@/utils/format'
-import StatusBadge from '@/components/buyer/StatusBadge.vue'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Skeleton } from '@/components/ui/skeleton'
-import { Toaster } from '@/components/ui/sonner'
 
 const authStore = useAuthStore()
 const token = computed(() => authStore.accessToken ?? '')
+
+const STATUS_LABEL: Record<string, string> = {
+  completed: 'Selesai',
+  cancelled: 'Dibatalkan',
+}
 
 const pageSize = 20
 const page = ref(1)
 const filters = reactive({ status: '', date_from: '', date_to: '' })
 const expanded = ref<string | null>(null)
 
-const result = ref<HistoryResponse>({ data: [], total: 0, page: 1, page_size: pageSize })
+const result = ref<HistoryResponse>({
+  data: [], total: 0, page: 1, page_size: pageSize,
+  total_revenue: '0', completed_count: 0, cancelled_count: 0,
+})
 const loading = ref(false)
 const error = ref<string | null>(null)
+
+function rp(n: number | string) {
+  const num = typeof n === 'string' ? parseFloat(n) : n
+  return 'Rp ' + num.toLocaleString('id-ID')
+}
+
+function fmtDate(t: string) {
+  return t ? new Date(t).toLocaleString('id-ID', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '-'
+}
 
 async function load() {
   loading.value = true
@@ -159,10 +161,7 @@ async function load() {
   }
 }
 
-function goPage(p: number) {
-  page.value = p
-  load()
-}
+function goPage(p: number) { page.value = p; load() }
 
 function resetFilters() {
   filters.status = ''

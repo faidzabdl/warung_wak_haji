@@ -39,14 +39,17 @@ def _check_magic(content_type: str, data: bytes) -> bool:
 # ---------------------------------------------------------------------------
 
 
-async def get_active_menus() -> list[dict]:
-    """Return all menus visible to the public (is_active=True, is_available=True)."""
+async def get_menus() -> list[dict]:
+    """Return all active menus (is_active=True), including is_available=False.
+
+    is_available=False menus are returned so the buyer UI can show a disabled
+    'HABIS' button. Availability is validated at order creation time (RPC).
+    """
     client = get_anon_client()
     response = (
         client.table("menus")
         .select("*")
         .eq("is_active", True)
-        .eq("is_available", True)
         .execute()
     )
     return response.data or []
@@ -145,6 +148,26 @@ async def set_availability(menu_id: str, is_available: bool) -> dict:
             detail={"error": {"code": "MENU_NOT_FOUND", "message": "Menu not found"}},
         )
     return response.data[0]
+
+
+async def delete_menu(menu_id: str) -> None:
+    """Soft-delete a menu by setting is_active=False.
+
+    Raises 404 if the menu does not exist.
+    """
+    client = get_service_client()
+    response = (
+        client.table("menus")
+        .update({"is_active": False})
+        .eq("id", menu_id)
+        .execute()
+    )
+    if not response.data:
+        raise HTTPException(
+            status_code=404,
+            detail={"error": {"code": "MENU_NOT_FOUND", "message": "Menu not found"}},
+        )
+
 
 
 # ---------------------------------------------------------------------------

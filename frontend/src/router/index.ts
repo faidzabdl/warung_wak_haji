@@ -21,11 +21,6 @@ const router = createRouter({
       component: () => import('@/pages/buyer/CheckoutPage.vue'),
     },
     {
-      path: '/order/:orderNumber/proof',
-      name: 'proof',
-      component: () => import('@/pages/buyer/ProofUploadPage.vue'),
-    },
-    {
       path: '/track',
       name: 'track-input',
       component: () => import('@/pages/buyer/TrackInputPage.vue'),

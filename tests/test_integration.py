@@ -6,18 +6,19 @@ functions (no real Supabase connection needed).  Each step verifies:
   - Correct HTTP status code
   - Required fields present in the response body
 
-Steps:
+Steps (QRIS flow):
   1.  POST /orders                             → 201, has order_number + tracking_token
   2.  GET  /orders/track/{token}               → 200, has items and order_status
-  3.  POST /orders/{order_number}/proof        → 200, payment_status=pending_verification
-  4.  GET  /seller/orders                      → 200, list not empty
-  5.  GET  /seller/orders/{order_number}       → 200, has items
-  6.  POST /seller/orders/{num}/verify-payment → 200
-  7.  POST /seller/orders/{num}/start-processing → 200
-  8.  POST /seller/orders/{num}/complete       → 200
-  9.  GET  /seller/history                     → 200, has pagination fields
+  3.  GET  /seller/orders                      → 200, list not empty
+  4.  GET  /seller/orders/{order_number}       → 200, has items (new field names)
+  5.  POST /seller/orders/{num}/verify-payment → 200, order_status=processing
+  6.  POST /seller/orders/{num}/mark-ready     → 200, order_status=ready
+  7.  POST /seller/orders/{num}/complete       → 200, order_status=completed
+  8.  GET  /seller/history                     → 200, has pagination + summary fields
+
+Note: Proof upload endpoint has been removed. QRIS verification goes directly
+through seller's verify-payment action.
 """
-from io import BytesIO
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -37,88 +38,88 @@ _BASE_ORDER = {
     "id": _ORDER_ID,
     "order_number": _ORDER_NUMBER,
     "buyer_name": "Andi",
+    "table_number": "7",
+    "payment_method": "qris",
     "notes": "Extra spicy",
     "order_status": "awaiting_payment",
     "payment_status": "pending_payment",
     "total_amount": "30000",
     "tracking_token_hash": "somehashvalue",
     "idempotency_key": None,
-    "payment_proof_path": None,
     "cancel_reason": None,
-    "reject_reason": None,
     "created_at": "2024-01-15T08:00:00",
     "updated_at": "2024-01-15T08:00:00",
 }
 
-_ORDER_WITH_ITEMS = {
-    **_BASE_ORDER,
-    "items": [
-        {
-            # Router reads these DB column names from the service result
-            "menu_name_snapshot": "Nasi Goreng",
-            "menu_price_snapshot": "15000",
-            "quantity": 2,
-            "subtotal": "30000",
-            "menu_id": "aaaaaaaa-0000-0000-0000-000000000001",
-        }
-    ],
+# Items use new schema: menu_type / name / qty / subtotal / menu_id
+_ITEM_SNAPSHOT = {
+    "menu_name_snapshot": "Nasi Goreng",
+    "menu_price_snapshot": "15000",
+    "quantity": 2,
+    "subtotal": "30000",
+    "menu_id": "aaaaaaaa-0000-0000-0000-000000000001",
 }
 
-_ORDER_AFTER_PROOF = {
+_ORDER_WITH_ITEMS = {
     **_BASE_ORDER,
-    "payment_status": "pending_verification",
-    "payment_proof_path": f"payment-proofs/{_ORDER_ID}/proof.jpg",
+    "items": [_ITEM_SNAPSHOT],
 }
 
 _ACTIVE_LIST = [
     {
         "order_number": _ORDER_NUMBER,
         "buyer_name": "Andi",
+        "table_number": "7",
+        "payment_method": "qris",
         "order_status": "awaiting_payment",
-        "payment_status": "pending_verification",
+        "payment_status": "pending_payment",
         "total_amount": "30000",
         "item_count": 1,
         "created_at": "2024-01-15T08:00:00",
     }
 ]
 
+_DETAIL_ITEM = {
+    "menu_type": "Makanan",
+    "name": "Nasi Goreng",
+    "qty": 2,
+    "subtotal": "30000",
+    "menu_id": "aaaaaaaa-0000-0000-0000-000000000001",
+}
+
 _DETAIL_RESPONSE = {
     "order_number": _ORDER_NUMBER,
     "buyer_name": "Andi",
+    "table_number": "7",
+    "payment_method": "qris",
     "notes": "Extra spicy",
     "order_status": "awaiting_payment",
-    "payment_status": "pending_verification",
+    "payment_status": "pending_payment",
     "total_amount": "30000",
-    "items": [
-        {
-            "menu_name": "Nasi Goreng",
-            "menu_price": "15000",
-            "quantity": 2,
-            "subtotal": "30000",
-            "menu_id": "aaaaaaaa-0000-0000-0000-000000000001",
-        }
-    ],
-    "payment_proof_url": "https://supabase.example.com/signed/proof.jpg",
+    "items": [_DETAIL_ITEM],
     "cancel_reason": None,
-    "reject_reason": None,
     "created_at": "2024-01-15T08:00:00",
     "updated_at": "2024-01-15T08:00:00",
 }
 
+# verify-payment: awaiting_payment → processing + payment_status → paid
 _ORDER_AFTER_VERIFY = {
-    **_BASE_ORDER,
-    "order_status": "waiting_processing",
+    "order_number": _ORDER_NUMBER,
+    "order_status": "processing",
     "payment_status": "paid",
 }
 
-_ORDER_AFTER_START = {
-    **_ORDER_AFTER_VERIFY,
-    "order_status": "processing",
+# mark-ready: processing → ready
+_ORDER_AFTER_READY = {
+    "order_number": _ORDER_NUMBER,
+    "order_status": "ready",
 }
 
+# complete: ready → completed
 _ORDER_AFTER_COMPLETE = {
-    **_ORDER_AFTER_START,
+    "order_number": _ORDER_NUMBER,
     "order_status": "completed",
+    "payment_status": "paid",
 }
 
 _HISTORY_PAGE = {
@@ -126,29 +127,23 @@ _HISTORY_PAGE = {
         {
             "order_number": _ORDER_NUMBER,
             "buyer_name": "Andi",
+            "table_number": "7",
+            "payment_method": "qris",
             "order_status": "completed",
             "payment_status": "paid",
             "total_amount": "30000",
-            "items": [
-                {
-                    "menu_name": "Nasi Goreng",
-                    "menu_price": "15000",
-                    "quantity": 2,
-                    "subtotal": "30000",
-                    "menu_id": "aaaaaaaa-0000-0000-0000-000000000001",
-                }
-            ],
+            "items": [_DETAIL_ITEM],
             "cancel_reason": None,
-            "reject_reason": None,
             "created_at": "2024-01-15T08:00:00",
         }
     ],
     "total": 1,
     "page": 1,
     "page_size": 20,
+    "total_revenue": "30000",
+    "completed_count": 1,
+    "cancelled_count": 0,
 }
-
-JPEG_MAGIC = b"\xff\xd8\xff" + b"\x00" * 100
 
 
 def _seller_headers() -> dict:
@@ -162,11 +157,13 @@ def _seller_headers() -> dict:
 
 async def test_full_order_lifecycle(client: AsyncClient):
     """
-    Integration test: buyer creates order → uploads proof → seller verifies
-    → seller starts processing → seller completes → order appears in history.
+    Integration test: buyer creates QRIS order → seller verifies → marks ready
+    → completes → order appears in history.
 
     All service calls are mocked but the test verifies the full endpoint chain
     returns correct HTTP statuses and response shapes.
+
+    Note: Proof upload step removed — no longer part of the flow.
     """
 
     # ------------------------------------------------------------------
@@ -180,6 +177,8 @@ async def test_full_order_lifecycle(client: AsyncClient):
             "/orders",
             json={
                 "buyer_name": "Andi",
+                "table_number": "7",
+                "payment_method": "qris",
                 "items": [
                     {
                         "menu_id": "aaaaaaaa-0000-0000-0000-000000000001",
@@ -214,113 +213,104 @@ async def test_full_order_lifecycle(client: AsyncClient):
     assert isinstance(step2_data["items"], list)
     assert len(step2_data["items"]) == 1
     assert "order_status" in step2_data, "Step 2: missing order_status"
+    assert step2_data["order_status"] == "awaiting_payment"
 
     # ------------------------------------------------------------------
-    # Step 3 — POST /orders/{order_number}/proof  →  200, pending_verification
-    # ------------------------------------------------------------------
-    with patch(
-        "routers.order.order_service.upload_proof",
-        new=AsyncMock(return_value=_ORDER_AFTER_PROOF),
-    ):
-        step3 = await client.post(
-            f"/orders/{order_number}/proof",
-            files={"file": ("proof.jpg", BytesIO(JPEG_MAGIC), "image/jpeg")},
-            headers={"X-Tracking-Token": tracking_token},
-        )
-
-    assert step3.status_code == 200, f"Step 3 failed: {step3.text}"
-    step3_data = step3.json()
-    assert step3_data["payment_status"] == "pending_verification", (
-        f"Step 3: expected payment_status=pending_verification, got {step3_data.get('payment_status')}"
-    )
-
-    # ------------------------------------------------------------------
-    # Step 4 — GET /seller/orders  →  200, list not empty
+    # Step 3 — GET /seller/orders  →  200, list not empty
     # ------------------------------------------------------------------
     with patch(
         "routers.seller.list_active_orders",
         new=AsyncMock(return_value=_ACTIVE_LIST),
     ):
-        step4 = await client.get("/seller/orders", headers=_seller_headers())
+        step3 = await client.get("/seller/orders", headers=_seller_headers())
 
-    assert step4.status_code == 200, f"Step 4 failed: {step4.text}"
-    step4_data = step4.json()
-    assert isinstance(step4_data, list), "Step 4: expected list"
-    assert len(step4_data) >= 1, "Step 4: expected at least one active order"
+    assert step3.status_code == 200, f"Step 3 failed: {step3.text}"
+    step3_data = step3.json()
+    assert isinstance(step3_data, list), "Step 3: expected list"
+    assert len(step3_data) >= 1, "Step 3: expected at least one active order"
+    assert step3_data[0]["payment_method"] == "qris", "Step 3: missing payment_method"
 
     # ------------------------------------------------------------------
-    # Step 5 — GET /seller/orders/{order_number}  →  200, has items
+    # Step 4 — GET /seller/orders/{order_number}  →  200, has items (new fields)
     # ------------------------------------------------------------------
     with patch(
         "routers.seller.get_order_detail",
         new=AsyncMock(return_value=_DETAIL_RESPONSE),
     ):
-        step5 = await client.get(
+        step4 = await client.get(
             f"/seller/orders/{order_number}", headers=_seller_headers()
         )
 
-    assert step5.status_code == 200, f"Step 5 failed: {step5.text}"
-    step5_data = step5.json()
-    assert "items" in step5_data, "Step 5: missing items"
-    assert isinstance(step5_data["items"], list)
+    assert step4.status_code == 200, f"Step 4 failed: {step4.text}"
+    step4_data = step4.json()
+    assert "items" in step4_data, "Step 4: missing items"
+    assert isinstance(step4_data["items"], list)
+    item = step4_data["items"][0]
+    assert "name" in item, "Step 4: item missing 'name'"
+    assert "qty" in item, "Step 4: item missing 'qty'"
+    assert "menu_type" in item, "Step 4: item missing 'menu_type'"
+    assert "payment_proof_url" not in step4_data, "Step 4: payment_proof_url must not exist"
 
     # ------------------------------------------------------------------
-    # Step 6 — POST /seller/orders/{order_number}/verify-payment  →  200
+    # Step 5 — POST /seller/orders/{num}/verify-payment  →  200 processing+paid
     # ------------------------------------------------------------------
     with patch(
         "routers.seller.verify_payment",
         new=AsyncMock(return_value=_ORDER_AFTER_VERIFY),
     ):
-        step6 = await client.post(
+        step5 = await client.post(
             f"/seller/orders/{order_number}/verify-payment",
             headers=_seller_headers(),
         )
 
-    assert step6.status_code == 200, f"Step 6 failed: {step6.text}"
+    assert step5.status_code == 200, f"Step 5 failed: {step5.text}"
+    assert step5.json()["order_status"] == "processing", "Step 5: wrong order_status"
+    assert step5.json()["payment_status"] == "paid", "Step 5: wrong payment_status"
 
     # ------------------------------------------------------------------
-    # Step 7 — POST /seller/orders/{order_number}/start-processing  →  200
+    # Step 6 — POST /seller/orders/{num}/mark-ready  →  200, ready
     # ------------------------------------------------------------------
     with patch(
-        "routers.seller.start_processing",
-        new=AsyncMock(return_value=_ORDER_AFTER_START),
+        "routers.seller.mark_ready",
+        new=AsyncMock(return_value=_ORDER_AFTER_READY),
     ):
-        step7 = await client.post(
-            f"/seller/orders/{order_number}/start-processing",
+        step6 = await client.post(
+            f"/seller/orders/{order_number}/mark-ready",
             headers=_seller_headers(),
         )
 
-    assert step7.status_code == 200, f"Step 7 failed: {step7.text}"
+    assert step6.status_code == 200, f"Step 6 failed: {step6.text}"
+    assert step6.json()["order_status"] == "ready", "Step 6: wrong order_status"
 
     # ------------------------------------------------------------------
-    # Step 8 — POST /seller/orders/{order_number}/complete  →  200
+    # Step 7 — POST /seller/orders/{num}/complete  →  200, completed
     # ------------------------------------------------------------------
     with patch(
         "routers.seller.complete_order",
         new=AsyncMock(return_value=_ORDER_AFTER_COMPLETE),
     ):
-        step8 = await client.post(
+        step7 = await client.post(
             f"/seller/orders/{order_number}/complete",
             headers=_seller_headers(),
         )
 
-    assert step8.status_code == 200, f"Step 8 failed: {step8.text}"
+    assert step7.status_code == 200, f"Step 7 failed: {step7.text}"
+    assert step7.json()["order_status"] == "completed", "Step 7: wrong order_status"
 
     # ------------------------------------------------------------------
-    # Step 9 — GET /seller/history  →  200, has pagination fields
+    # Step 8 — GET /seller/history  →  200, has pagination + summary fields
     # ------------------------------------------------------------------
     with patch(
         "routers.seller.get_history",
         new=AsyncMock(return_value=_HISTORY_PAGE),
     ):
-        step9 = await client.get("/seller/history", headers=_seller_headers())
+        step8 = await client.get("/seller/history", headers=_seller_headers())
 
-    assert step9.status_code == 200, f"Step 9 failed: {step9.text}"
-    step9_data = step9.json()
-    for field in ("data", "total", "page", "page_size"):
-        assert field in step9_data, f"Step 9: missing pagination field '{field}'"
-    assert isinstance(step9_data["data"], list)
-    # Confirm the completed order is present in history
+    assert step8.status_code == 200, f"Step 8 failed: {step8.text}"
+    step8_data = step8.json()
+    for field in ("data", "total", "page", "page_size", "total_revenue", "completed_count", "cancelled_count"):
+        assert field in step8_data, f"Step 8: missing field '{field}'"
+    assert isinstance(step8_data["data"], list)
     assert any(
-        o["order_number"] == _ORDER_NUMBER for o in step9_data["data"]
-    ), "Step 9: completed order not found in history"
+        o["order_number"] == _ORDER_NUMBER for o in step8_data["data"]
+    ), "Step 8: completed order not found in history"

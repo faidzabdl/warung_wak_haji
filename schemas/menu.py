@@ -8,6 +8,8 @@ class MenuCreate(BaseModel):
     description: str | None = None
     price: Decimal
     image_url: str | None = None
+    menu_type: str = "Makanan"
+    category: str = "Umum"
     is_available: bool = True
     is_active: bool = True
 
@@ -30,12 +32,21 @@ class MenuCreate(BaseModel):
             raise ValueError("price must be greater than 0")
         return v
 
+    @field_validator("menu_type")
+    @classmethod
+    def menu_type_valid(cls, v: str) -> str:
+        if v not in ("Makanan", "Minuman"):
+            raise ValueError("menu_type must be 'Makanan' or 'Minuman'")
+        return v
+
 
 class MenuUpdate(BaseModel):
     name: str | None = None
     description: str | None = None
     price: Decimal | None = None
     image_url: str | None = None
+    menu_type: str | None = None
+    category: str | None = None
     is_available: bool | None = None
     is_active: bool | None = None
 
@@ -58,6 +69,13 @@ class MenuUpdate(BaseModel):
             raise ValueError("price must be greater than 0")
         return v
 
+    @field_validator("menu_type")
+    @classmethod
+    def menu_type_valid(cls, v: str | None) -> str | None:
+        if v is not None and v not in ("Makanan", "Minuman"):
+            raise ValueError("menu_type must be 'Makanan' or 'Minuman'")
+        return v
+
 
 class AvailabilityUpdate(BaseModel):
     is_available: bool
@@ -71,6 +89,8 @@ class MenuResponse(BaseModel):
     description: str | None
     price: Decimal
     image_url: str | None
+    menu_type: str
+    category: str
     is_available: bool
     is_active: bool
     created_at: str

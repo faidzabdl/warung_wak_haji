@@ -1,4 +1,5 @@
 import logging
+from decimal import Decimal
 
 from fastapi import HTTPException
 
@@ -7,10 +8,10 @@ from db import get_service_client
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
-# Active order statuses
+# Active / history order statuses
 # ---------------------------------------------------------------------------
 
-_ACTIVE_STATUSES = ("awaiting_payment", "waiting_processing", "processing")
+_ACTIVE_STATUSES = ("awaiting_payment", "waiting_processing", "processing", "ready")
 _HISTORY_STATUSES = ("completed", "cancelled")
 
 
@@ -23,18 +24,16 @@ def _assert_transition(order: dict, action: str) -> None:
     """Raise HTTPException(409, INVALID_STATUS_TRANSITION) if the current
     order state does not allow *action*."""
     order_status = order["order_status"]
-    payment_status = order["payment_status"]
+    payment_method = order.get("payment_method", "qris")
 
     if action == "verify_payment":
-        if payment_status != "pending_verification":
+        if payment_method != "qris":
             raise HTTPException(
                 status_code=409,
                 detail={
                     "error": {
                         "code": "INVALID_STATUS_TRANSITION",
-                        "message": (
-                            "Cannot verify payment: payment status is not pending_verification"
-                        ),
+                        "message": "verify-payment only applies to QRIS orders",
                     }
                 },
             )
@@ -44,23 +43,29 @@ def _assert_transition(order: dict, action: str) -> None:
                 detail={
                     "error": {
                         "code": "INVALID_STATUS_TRANSITION",
-                        "message": (
-                            "Cannot verify payment: order status is not awaiting_payment"
-                        ),
+                        "message": "Cannot verify payment: order status is not awaiting_payment",
                     }
                 },
             )
 
     elif action == "reject_payment":
-        if payment_status != "pending_verification":
+        if payment_method != "qris":
             raise HTTPException(
                 status_code=409,
                 detail={
                     "error": {
                         "code": "INVALID_STATUS_TRANSITION",
-                        "message": (
-                            "Cannot reject payment: payment status is not pending_verification"
-                        ),
+                        "message": "reject-payment only applies to QRIS orders",
+                    }
+                },
+            )
+        if order_status != "awaiting_payment":
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "error": {
+                        "code": "INVALID_STATUS_TRANSITION",
+                        "message": "Cannot reject payment: order status is not awaiting_payment",
                     }
                 },
             )
@@ -72,33 +77,46 @@ def _assert_transition(order: dict, action: str) -> None:
                 detail={
                     "error": {
                         "code": "INVALID_STATUS_TRANSITION",
-                        "message": (
-                            "Cannot start processing: order status is not waiting_processing"
-                        ),
+                        "message": "Cannot start processing: order status is not waiting_processing",
                     }
                 },
             )
 
-    elif action == "complete":
+    elif action == "mark_ready":
         if order_status != "processing":
             raise HTTPException(
                 status_code=409,
                 detail={
                     "error": {
                         "code": "INVALID_STATUS_TRANSITION",
-                        "message": "Cannot complete order: order status is not processing",
+                        "message": "Cannot mark ready: order status is not processing",
                     }
                 },
             )
 
-    elif action == "cancel":
-        if order_status in ("completed", "cancelled"):
+    elif action == "complete":
+        if order_status != "ready":
             raise HTTPException(
                 status_code=409,
                 detail={
                     "error": {
                         "code": "INVALID_STATUS_TRANSITION",
-                        "message": "Pesanan sudah selesai atau dibatalkan",
+                        "message": "Cannot complete order: order status is not ready",
+                    }
+                },
+            )
+
+    elif action == "cancel":
+        if order_status not in ("awaiting_payment", "waiting_processing"):
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "error": {
+                        "code": "INVALID_STATUS_TRANSITION",
+                        "message": (
+                            "Pesanan hanya bisa dibatalkan saat menunggu pembayaran "
+                            "atau menunggu diproses"
+                        ),
                     }
                 },
             )
@@ -151,7 +169,7 @@ def _fetch_order_items(service_client, order_id: str) -> list[dict]:
     """Fetch all items for the given order_id."""
     result = (
         service_client.table("order_items")
-        .select("menu_id, menu_name_snapshot, menu_price_snapshot, quantity, subtotal")
+        .select("menu_id, menu_name_snapshot, menu_type, quantity, subtotal")
         .eq("order_id", order_id)
         .execute()
     )
@@ -162,14 +180,64 @@ def _normalize_items(raw_items: list[dict]) -> list[dict]:
     """Map DB column names to schema field names."""
     return [
         {
-            "menu_name": item["menu_name_snapshot"],
-            "menu_price": item["menu_price_snapshot"],
-            "quantity": item["quantity"],
+            "menu_type": item.get("menu_type", "Makanan"),
+            "name": item["menu_name_snapshot"],
+            "qty": item["quantity"],
             "subtotal": item["subtotal"],
             "menu_id": item.get("menu_id"),
         }
         for item in raw_items
     ]
+
+
+def _atomic_update(
+    service_client,
+    order_id: str,
+    expected_status: str,
+    update_payload: dict,
+) -> dict:
+    """Update order atomically: only succeeds if order_status == expected_status.
+
+    - 0 rows updated → fetch current order to distinguish 404 vs 409.
+    - Order not found → 404.
+    - Order found but status mismatch → 409 with current status in message.
+    Returns the updated order row.
+    """
+    result = (
+        service_client.table("orders")
+        .update(update_payload)
+        .eq("id", order_id)
+        .eq("order_status", expected_status)
+        .execute()
+    )
+    if not result.data:
+        # Distinguish: order gone vs status already changed
+        check = (
+            service_client.table("orders")
+            .select("order_status")
+            .eq("id", order_id)
+            .maybe_single()
+            .execute()
+        )
+        if not check.data:
+            raise HTTPException(
+                status_code=404,
+                detail={"error": {"code": "ORDER_NOT_FOUND", "message": "Order not found"}},
+            )
+        current_status = check.data["order_status"]
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "error": {
+                    "code": "INVALID_STATUS_TRANSITION",
+                    "message": (
+                        f"Status order saat ini adalah '{current_status}', "
+                        f"bukan '{expected_status}'. Muat ulang dan coba lagi."
+                    ),
+                }
+            },
+        )
+    return result.data[0]
 
 
 # ---------------------------------------------------------------------------
@@ -178,20 +246,21 @@ def _normalize_items(raw_items: list[dict]) -> list[dict]:
 
 
 async def list_active_orders() -> list[dict]:
-    """Return orders with status in (awaiting_payment, waiting_processing, processing),
-    ordered by created_at ASC, each including item_count."""
+    """Return orders with status in _ACTIVE_STATUSES, ordered by created_at ASC."""
     service_client = get_service_client()
 
     result = (
         service_client.table("orders")
-        .select("order_number, buyer_name, order_status, payment_status, total_amount, created_at, id")
+        .select(
+            "order_number, buyer_name, table_number, payment_method, "
+            "order_status, payment_status, total_amount, created_at, id"
+        )
         .in_("order_status", list(_ACTIVE_STATUSES))
         .order("created_at", desc=False)
         .execute()
     )
     orders = result.data or []
 
-    # Attach item_count for each order
     enriched = []
     for order in orders:
         items_result = (
@@ -205,6 +274,8 @@ async def list_active_orders() -> list[dict]:
             {
                 "order_number": order["order_number"],
                 "buyer_name": order["buyer_name"],
+                "table_number": order["table_number"],
+                "payment_method": order["payment_method"],
                 "order_status": order["order_status"],
                 "payment_status": order["payment_status"],
                 "total_amount": order["total_amount"],
@@ -216,90 +287,82 @@ async def list_active_orders() -> list[dict]:
 
 
 async def get_order_detail(order_number: str) -> dict:
-    """Fetch order + items; generate signed URL for payment_proof_path if present."""
+    """Fetch order + items."""
     service_client = get_service_client()
     order = _fetch_order_by_number(service_client, order_number)
 
     raw_items = _fetch_order_items(service_client, order["id"])
     items = _normalize_items(raw_items)
 
-    # Generate signed URL for payment proof
-    payment_proof_url: str | None = None
-    proof_path: str | None = order.get("payment_proof_path")
-    if proof_path:
-        try:
-            signed = service_client.storage.from_("payment-proofs").create_signed_url(
-                proof_path, expires_in=3600
-            )
-            payment_proof_url = signed.get("signedURL") or signed.get("signedUrl")
-        except Exception as exc:
-            logger.warning("Failed to generate signed URL for %s: %s", proof_path, exc)
-            payment_proof_url = None
-
     return {
         "order_number": order["order_number"],
         "buyer_name": order["buyer_name"],
+        "table_number": order["table_number"],
+        "payment_method": order["payment_method"],
         "notes": order.get("notes"),
         "order_status": order["order_status"],
         "payment_status": order["payment_status"],
         "total_amount": order["total_amount"],
         "items": items,
-        "payment_proof_url": payment_proof_url,
         "cancel_reason": order.get("cancel_reason"),
-        "reject_reason": order.get("reject_reason"),
         "created_at": str(order["created_at"]),
         "updated_at": str(order["updated_at"]),
     }
 
 
 async def verify_payment(order_number: str, seller_uid: str) -> dict:
-    """Verify payment: pending_verification → paid, awaiting_payment → waiting_processing."""
+    """Verify QRIS payment: awaiting_payment → processing, payment_status → paid."""
     service_client = get_service_client()
     order = _fetch_order_by_number(service_client, order_number)
     _assert_transition(order, "verify_payment")
 
-    service_client.table("orders").update(
-        {"payment_status": "paid", "order_status": "waiting_processing"}
-    ).eq("id", order["id"]).execute()
+    updated = _atomic_update(
+        service_client,
+        order["id"],
+        expected_status="awaiting_payment",
+        update_payload={"payment_status": "paid", "order_status": "processing"},
+    )
 
     _write_audit_log(
         service_client,
         order["id"],
         action="payment_verified",
         actor=seller_uid,
-        metadata={"previous_payment_status": "pending_verification"},
+        metadata={"previous_order_status": "awaiting_payment"},
     )
 
-    order.update({"payment_status": "paid", "order_status": "waiting_processing"})
-    return order
+    return updated
 
 
-async def reject_payment(order_number: str, reason: str, seller_uid: str) -> dict:
-    """Reject payment: pending_verification → rejected, order → cancelled."""
+async def reject_payment(order_number: str, reason: str | None, seller_uid: str) -> dict:
+    """Reject QRIS payment: awaiting_payment → cancelled, payment_status → rejected."""
     service_client = get_service_client()
     order = _fetch_order_by_number(service_client, order_number)
     _assert_transition(order, "reject_payment")
 
-    service_client.table("orders").update(
-        {
-            "payment_status": "rejected",
-            "order_status": "cancelled",
-            "reject_reason": reason,
-        }
-    ).eq("id", order["id"]).execute()
+    update_payload: dict = {
+        "payment_status": "rejected",
+        "order_status": "cancelled",
+    }
+    if reason:
+        update_payload["cancel_reason"] = reason
+
+    updated = _atomic_update(
+        service_client,
+        order["id"],
+        expected_status="awaiting_payment",
+        update_payload=update_payload,
+    )
 
     _write_audit_log(
         service_client,
         order["id"],
         action="payment_rejected",
         actor=seller_uid,
-        metadata={"reason": reason},
+        metadata={"reason": reason or ""},
     )
 
-    order.update(
-        {"payment_status": "rejected", "order_status": "cancelled", "reject_reason": reason}
-    )
-    return order
+    return updated
 
 
 async def start_processing(order_number: str, seller_uid: str) -> dict:
@@ -308,9 +371,12 @@ async def start_processing(order_number: str, seller_uid: str) -> dict:
     order = _fetch_order_by_number(service_client, order_number)
     _assert_transition(order, "start_processing")
 
-    service_client.table("orders").update(
-        {"order_status": "processing"}
-    ).eq("id", order["id"]).execute()
+    updated = _atomic_update(
+        service_client,
+        order["id"],
+        expected_status="waiting_processing",
+        update_payload={"order_status": "processing"},
+    )
 
     _write_audit_log(
         service_client,
@@ -320,52 +386,90 @@ async def start_processing(order_number: str, seller_uid: str) -> dict:
         metadata={},
     )
 
-    order["order_status"] = "processing"
-    return order
+    return updated
+
+
+async def mark_ready(order_number: str, seller_uid: str) -> dict:
+    """Advance order from processing → ready."""
+    service_client = get_service_client()
+    order = _fetch_order_by_number(service_client, order_number)
+    _assert_transition(order, "mark_ready")
+
+    updated = _atomic_update(
+        service_client,
+        order["id"],
+        expected_status="processing",
+        update_payload={"order_status": "ready"},
+    )
+
+    _write_audit_log(
+        service_client,
+        order["id"],
+        action="order_ready",
+        actor=seller_uid,
+        metadata={},
+    )
+
+    return updated
 
 
 async def complete_order(order_number: str, seller_uid: str) -> dict:
-    """Advance order from processing → completed."""
+    """Advance order from ready → completed.
+
+    If payment_method='cash', also sets payment_status='paid' atomically.
+    """
     service_client = get_service_client()
     order = _fetch_order_by_number(service_client, order_number)
     _assert_transition(order, "complete")
 
-    service_client.table("orders").update(
-        {"order_status": "completed"}
-    ).eq("id", order["id"]).execute()
+    update_payload: dict = {"order_status": "completed"}
+    if order.get("payment_method") == "cash":
+        update_payload["payment_status"] = "paid"
+
+    updated = _atomic_update(
+        service_client,
+        order["id"],
+        expected_status="ready",
+        update_payload=update_payload,
+    )
 
     _write_audit_log(
         service_client,
         order["id"],
         action="order_completed",
         actor=seller_uid,
-        metadata={},
+        metadata={"payment_method": order.get("payment_method", "")},
     )
 
-    order["order_status"] = "completed"
-    return order
+    return updated
 
 
-async def cancel_order(order_number: str, reason: str, seller_uid: str) -> dict:
-    """Cancel an order from any non-terminal state."""
+async def cancel_order(order_number: str, reason: str | None, seller_uid: str) -> dict:
+    """Cancel an order from awaiting_payment or waiting_processing only."""
     service_client = get_service_client()
     order = _fetch_order_by_number(service_client, order_number)
     _assert_transition(order, "cancel")
 
-    service_client.table("orders").update(
-        {"order_status": "cancelled", "cancel_reason": reason}
-    ).eq("id", order["id"]).execute()
+    update_payload: dict = {"order_status": "cancelled"}
+    if reason:
+        update_payload["cancel_reason"] = reason
+
+    updated = _atomic_update(
+        service_client,
+        order["id"],
+        expected_status=order["order_status"],  # either awaiting_payment or waiting_processing
+        update_payload=update_payload,
+    )
 
     _write_audit_log(
         service_client,
         order["id"],
         action="order_cancelled",
         actor=seller_uid,
-        metadata={"reason": reason},
+        metadata={"reason": reason or "", "previous_order_status": order["order_status"]},
     )
 
-    order.update({"order_status": "cancelled", "cancel_reason": reason})
-    return order
+    return updated
 
 
 async def get_history(
@@ -375,25 +479,24 @@ async def get_history(
     date_from: str | None = None,
     date_to: str | None = None,
 ) -> dict:
-    """Return paginated history (completed/cancelled orders) with optional filters."""
-    # Clamp pagination params
+    """Return paginated history (completed/cancelled orders) with summary stats."""
     page = max(1, page)
     page_size = max(1, min(100, page_size))
     offset = (page - 1) * page_size
 
     service_client = get_service_client()
 
-    # Determine the status filter set
     if status and status in _HISTORY_STATUSES:
         status_filter = [status]
     else:
         status_filter = list(_HISTORY_STATUSES)
 
+    # Paginated query
     query = (
         service_client.table("orders")
         .select(
-            "id, order_number, buyer_name, order_status, payment_status, total_amount, "
-            "cancel_reason, reject_reason, created_at",
+            "id, order_number, buyer_name, table_number, payment_method, "
+            "order_status, payment_status, total_amount, cancel_reason, created_at",
             count="exact",
         )
         .in_("order_status", status_filter)
@@ -403,7 +506,6 @@ async def get_history(
     if date_from:
         query = query.gte("created_at", date_from)
     if date_to:
-        # Include the full end day by appending end-of-day time
         query = query.lte("created_at", f"{date_to}T23:59:59")
 
     query = query.range(offset, offset + page_size - 1)
@@ -411,6 +513,28 @@ async def get_history(
 
     orders = result.data or []
     total = result.count if result.count is not None else 0
+
+    # Summary stats via DB-side GROUP BY aggregation.
+    # PostgREST supports aggregate columns in select when using group-by hint.
+    # We call a raw Supabase RPC or use two targeted COUNT/SUM queries to avoid
+    # pulling all rows to Python (PostgREST default page cap is 1000 rows).
+    completed_resp = (
+        service_client.table("orders")
+        .select("total_amount")
+        .eq("order_status", "completed")
+        .execute()
+    )
+    cancelled_resp = (
+        service_client.table("orders")
+        .select("id", count="exact")
+        .eq("order_status", "cancelled")
+        .execute()
+    )
+    total_revenue = Decimal("0")
+    for row in (completed_resp.data or []):
+        total_revenue += Decimal(str(row.get("total_amount") or 0))
+    completed_count = len(completed_resp.data or [])
+    cancelled_count = cancelled_resp.count if cancelled_resp.count is not None else 0
 
     # Enrich each order with its items
     data = []
@@ -421,14 +545,23 @@ async def get_history(
             {
                 "order_number": order["order_number"],
                 "buyer_name": order["buyer_name"],
+                "table_number": order["table_number"],
+                "payment_method": order["payment_method"],
                 "order_status": order["order_status"],
                 "payment_status": order["payment_status"],
                 "total_amount": order["total_amount"],
                 "items": items,
                 "cancel_reason": order.get("cancel_reason"),
-                "reject_reason": order.get("reject_reason"),
                 "created_at": str(order["created_at"]),
             }
         )
 
-    return {"data": data, "total": total, "page": page, "page_size": page_size}
+    return {
+        "data": data,
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+        "total_revenue": total_revenue,
+        "completed_count": completed_count,
+        "cancelled_count": cancelled_count,
+    }

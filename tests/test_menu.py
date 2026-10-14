@@ -22,6 +22,8 @@ MENU_1 = {
     "description": "Delicious fried rice",
     "price": "15000",
     "image_url": "https://example.com/nasi-goreng.jpg",
+    "menu_type": "Makanan",
+    "category": "Nasi",
     "is_available": True,
     "is_active": True,
     "created_at": "2024-01-01T00:00:00",
@@ -30,10 +32,12 @@ MENU_1 = {
 
 MENU_2 = {
     "id": "aaaaaaaa-0000-0000-0000-000000000002",
-    "name": "Mie Ayam",
-    "description": "Chicken noodle soup",
-    "price": "12000",
+    "name": "Es Teh",
+    "description": "Iced sweet tea",
+    "price": "5000",
     "image_url": None,
+    "menu_type": "Minuman",
+    "category": "Minuman Dingin",
     "is_available": True,
     "is_active": True,
     "created_at": "2024-01-02T00:00:00",
@@ -56,10 +60,10 @@ def _wrong_auth_header() -> dict:
 # ---------------------------------------------------------------------------
 
 
-async def test_get_active_menus_returns_list(client: AsyncClient):
-    """Mock returns 2 menus; response body is a list of 2."""
+async def test_get_menus_returns_list(client: AsyncClient):
+    """Mock returns 2 menus (including unavailable); response body is a list of 2."""
     with patch(
-        "routers.menu.get_active_menus",
+        "routers.menu.get_menus",
         new_callable=AsyncMock,
         return_value=[MENU_1, MENU_2],
     ):
@@ -70,13 +74,15 @@ async def test_get_active_menus_returns_list(client: AsyncClient):
     assert isinstance(data, list)
     assert len(data) == 2
     assert data[0]["name"] == "Nasi Goreng"
-    assert data[1]["name"] == "Mie Ayam"
+    assert data[0]["menu_type"] == "Makanan"
+    assert data[1]["name"] == "Es Teh"
+    assert data[1]["menu_type"] == "Minuman"
 
 
-async def test_get_active_menus_empty(client: AsyncClient):
+async def test_get_menus_empty(client: AsyncClient):
     """Mock returns empty list; response body is []."""
     with patch(
-        "routers.menu.get_active_menus",
+        "routers.menu.get_menus",
         new_callable=AsyncMock,
         return_value=[],
     ):
@@ -145,7 +151,7 @@ async def test_create_menu_wrong_uid(client: AsyncClient):
 
 
 async def test_create_menu_success(client: AsyncClient):
-    """Valid seller JWT + mocked service → 201 with menu data."""
+    """Valid seller JWT + mocked service → 201 with menu data including menu_type."""
     with patch(
         "routers.seller.create_menu",
         new_callable=AsyncMock,
@@ -153,7 +159,7 @@ async def test_create_menu_success(client: AsyncClient):
     ):
         response = await client.post(
             "/seller/menus",
-            json={"name": "Nasi Goreng", "price": "15000"},
+            json={"name": "Nasi Goreng", "price": "15000", "menu_type": "Makanan"},
             headers=_seller_auth_header(),
         )
 
@@ -161,6 +167,7 @@ async def test_create_menu_success(client: AsyncClient):
     data = response.json()
     assert data["name"] == "Nasi Goreng"
     assert data["id"] == MENU_1["id"]
+    assert data["menu_type"] == "Makanan"
 
 
 async def test_create_menu_invalid_price(client: AsyncClient):

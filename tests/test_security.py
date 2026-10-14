@@ -54,21 +54,23 @@ _SAMPLE_ORDER = {
     "id": "bbbbbbbb-0000-0000-0000-000000000001",
     "order_number": _ORDER_NUMBER,
     "buyer_name": "Budi",
+    "table_number": "5",
+    "payment_method": "qris",
     "notes": None,
     "order_status": "awaiting_payment",
     "payment_status": "pending_payment",
     "total_amount": "15000",
     "tracking_token_hash": "somehash",
     "idempotency_key": "idem-key-001",
-    "payment_proof_path": None,
     "cancel_reason": None,
-    "reject_reason": None,
     "created_at": "2024-01-01T00:00:00",
     "updated_at": "2024-01-01T00:00:00",
 }
 
 _VALID_BODY = {
     "buyer_name": "Budi",
+    "table_number": "5",
+    "payment_method": "qris",
     "items": [{"menu_id": "aaaaaaaa-0000-0000-0000-000000000001", "quantity": 2}],
 }
 
@@ -182,7 +184,8 @@ async def test_order_create_ignores_price_on_item(client: AsyncClient):
 # Section 3 — Token security
 # ===========================================================================
 # test_orders.py::test_track_order_invalid_token covers random-token → 404.
-# test_orders.py::test_upload_proof_wrong_token covers wrong token → 403 on proof upload.
+# Proof upload endpoint has been REMOVED — buyers no longer upload proof.
+# QRIS verification is done entirely by the seller via verify-payment.
 
 
 async def test_tracking_not_found_returns_404(client: AsyncClient):
@@ -213,122 +216,26 @@ async def test_tracking_not_found_returns_404(client: AsyncClient):
     assert response.json()["error"]["code"] == "INVALID_TRACKING_TOKEN"
 
 
-async def test_proof_upload_wrong_token_returns_403(client: AsyncClient):
+async def test_proof_upload_endpoint_removed(client: AsyncClient):
     """
-    Correct order_number but wrong X-Tracking-Token → 403 FORBIDDEN.
-    The token hash won't match any order so the service raises 403.
-
-    (Authoritative test: test_orders.py::test_upload_proof_wrong_token.
-    Retained here as a security-catalogue entry.)
+    POST /orders/{num}/proof no longer exists — proof upload was removed.
+    The endpoint must return 404 or 405 (not 500).
     """
-    with patch(
-        "routers.order.order_service.upload_proof",
-        new=AsyncMock(
-            side_effect=HTTPException(
-                status_code=403,
-                detail={"error": {"code": "FORBIDDEN", "message": "Invalid tracking token"}},
-            )
-        ),
-    ):
-        response = await client.post(
-            f"/orders/{_ORDER_NUMBER}/proof",
-            files={"file": ("proof.jpg", BytesIO(JPEG_MAGIC), "image/jpeg")},
-            headers={"X-Tracking-Token": "wrong-token-xyz"},
-        )
-
-    assert response.status_code == 403
-    assert response.json()["error"]["code"] == "FORBIDDEN"
+    response = await client.post(
+        f"/orders/{_ORDER_NUMBER}/proof",
+        files={"file": ("proof.jpg", BytesIO(JPEG_MAGIC), "image/jpeg")},
+        headers={"X-Tracking-Token": "any-token"},
+    )
+    assert response.status_code in (404, 405)
 
 
 # ===========================================================================
-# Section 4 — Re-upload guard
-# (Authoritative tests live in tests/test_orders.py)
+# Section 4 — Proof upload endpoint removed
 # ===========================================================================
-# test_upload_proof_already_paid     → 409 PROOF_UPLOAD_NOT_ALLOWED
-# test_upload_proof_rejected         → 409 PROOF_UPLOAD_NOT_ALLOWED
-# test_upload_proof_cancelled_order  → 409 PROOF_UPLOAD_NOT_ALLOWED
-#
-# The tests below exercise the same guard paths but via direct service-layer
-# logic assertions, not just endpoint mocking, so they provide independent
-# coverage of the guard conditions.
-
-
-async def test_proof_upload_blocked_when_paid(client: AsyncClient):
-    """payment_status=paid → service raises 409 PROOF_UPLOAD_NOT_ALLOWED."""
-    with patch(
-        "routers.order.order_service.upload_proof",
-        new=AsyncMock(
-            side_effect=HTTPException(
-                status_code=409,
-                detail={
-                    "error": {
-                        "code": "PROOF_UPLOAD_NOT_ALLOWED",
-                        "message": "Pembayaran sudah diverifikasi atau ditolak",
-                    }
-                },
-            )
-        ),
-    ):
-        response = await client.post(
-            f"/orders/{_ORDER_PAID}/proof",
-            files={"file": ("proof.jpg", BytesIO(JPEG_MAGIC), "image/jpeg")},
-            headers={"X-Tracking-Token": "plain-token-abc"},
-        )
-
-    assert response.status_code == 409
-    assert response.json()["error"]["code"] == "PROOF_UPLOAD_NOT_ALLOWED"
-
-
-async def test_proof_upload_blocked_when_rejected(client: AsyncClient):
-    """payment_status=rejected → 409 PROOF_UPLOAD_NOT_ALLOWED."""
-    with patch(
-        "routers.order.order_service.upload_proof",
-        new=AsyncMock(
-            side_effect=HTTPException(
-                status_code=409,
-                detail={
-                    "error": {
-                        "code": "PROOF_UPLOAD_NOT_ALLOWED",
-                        "message": "Pembayaran sudah diverifikasi atau ditolak",
-                    }
-                },
-            )
-        ),
-    ):
-        response = await client.post(
-            f"/orders/{_ORDER_REJECTED}/proof",
-            files={"file": ("proof.jpg", BytesIO(JPEG_MAGIC), "image/jpeg")},
-            headers={"X-Tracking-Token": "plain-token-abc"},
-        )
-
-    assert response.status_code == 409
-    assert response.json()["error"]["code"] == "PROOF_UPLOAD_NOT_ALLOWED"
-
-
-async def test_proof_upload_blocked_when_cancelled(client: AsyncClient):
-    """order_status=cancelled → 409 PROOF_UPLOAD_NOT_ALLOWED."""
-    with patch(
-        "routers.order.order_service.upload_proof",
-        new=AsyncMock(
-            side_effect=HTTPException(
-                status_code=409,
-                detail={
-                    "error": {
-                        "code": "PROOF_UPLOAD_NOT_ALLOWED",
-                        "message": "Pesanan sudah dibatalkan",
-                    }
-                },
-            )
-        ),
-    ):
-        response = await client.post(
-            f"/orders/{_ORDER_CANCEL}/proof",
-            files={"file": ("proof.jpg", BytesIO(JPEG_MAGIC), "image/jpeg")},
-            headers={"X-Tracking-Token": "plain-token-abc"},
-        )
-
-    assert response.status_code == 409
-    assert response.json()["error"]["code"] == "PROOF_UPLOAD_NOT_ALLOWED"
+# The /orders/{num}/proof endpoint has been deleted. Buyers no longer upload
+# payment proof. QRIS is verified by the seller via verify-payment.
+# The old re-upload guard tests (paid/rejected/cancelled) are no longer
+# applicable and have been removed.
 
 
 # ===========================================================================

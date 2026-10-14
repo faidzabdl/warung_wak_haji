@@ -6,7 +6,6 @@
       <div>
         <Label>{{ reasonLabel }}</Label>
         <Textarea v-model="reason" :placeholder="placeholder" class="mt-1" />
-        <p v-if="reasonError" class="text-xs text-destructive mt-1">{{ reasonError }}</p>
       </div>
       <div class="flex gap-2 mt-4 justify-end">
         <Button variant="outline" @click="cancel">Batal</Button>
@@ -35,31 +34,26 @@ withDefaults(defineProps<{
 }>(), {
   description: '',
   reasonLabel: 'Alasan',
-  placeholder: 'Masukkan alasan...',
+  placeholder: 'Masukkan alasan (opsional)...',
   confirmLabel: 'Konfirmasi',
   confirmVariant: 'destructive',
   submitting: false,
 })
 
 const emit = defineEmits<{
-  confirm: [reason: string]
+  confirm: [reason: string | null]
   cancel: []
 }>()
 
 const reason = ref('')
-const reasonError = ref('')
 
 function confirm() {
-  if (!reason.value.trim()) {
-    reasonError.value = 'Alasan wajib diisi.'
-    return
-  }
-  emit('confirm', reason.value.trim())
+  // reason is optional — pass null if empty
+  emit('confirm', reason.value.trim() || null)
 }
 
 function cancel() {
   reason.value = ''
-  reasonError.value = ''
   emit('cancel')
 }
 </script>

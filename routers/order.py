@@ -1,10 +1,10 @@
 from decimal import Decimal
 
-from fastapi import APIRouter, File, Header, Request, UploadFile
+from fastapi import APIRouter, Header, Request
 from fastapi.responses import JSONResponse
 
 from dependencies.rate_limit import limiter
-from schemas.order import OrderCreateRequest, OrderCreateResponse, OrderItemSnapshot, OrderTrackResponse, ProofUploadResponse
+from schemas.order import OrderCreateRequest, OrderCreateResponse, OrderItemSnapshot, OrderTrackResponse
 from services import order_service
 
 router = APIRouter(tags=["Orders"])
@@ -39,23 +39,6 @@ async def create_order(
     return JSONResponse(status_code=201, content=response.model_dump(mode="json"))
 
 
-@router.post("/orders/{order_number}/proof", status_code=200)
-@limiter.limit("10/minute")
-async def upload_proof(
-    request: Request,
-    order_number: str,
-    file: UploadFile = File(...),
-    x_tracking_token: str = Header(..., alias="X-Tracking-Token"),
-):
-    """Upload payment proof image. Requires X-Tracking-Token header."""
-    result = await order_service.upload_proof(order_number, file, x_tracking_token)
-    response = ProofUploadResponse(
-        message="Bukti pembayaran berhasil diunggah.",
-        payment_status=result["payment_status"],
-    )
-    return response
-
-
 @router.get("/orders/track/{tracking_token}", status_code=200)
 @limiter.limit("30/minute")
 async def track_order(request: Request, tracking_token: str):
@@ -65,6 +48,7 @@ async def track_order(request: Request, tracking_token: str):
         OrderItemSnapshot(
             menu_name=item["menu_name_snapshot"],
             menu_price=Decimal(str(item["menu_price_snapshot"])),
+            menu_type=item.get("menu_type", "Makanan"),
             quantity=item["quantity"],
             subtotal=Decimal(str(item["subtotal"])),
         )
@@ -73,6 +57,8 @@ async def track_order(request: Request, tracking_token: str):
     response = OrderTrackResponse(
         order_number=result["order_number"],
         buyer_name=result["buyer_name"],
+        table_number=result["table_number"],
+        payment_method=result["payment_method"],
         order_status=result["order_status"],
         payment_status=result["payment_status"],
         total_amount=Decimal(str(result["total_amount"])),

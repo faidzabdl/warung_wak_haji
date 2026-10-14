@@ -27,6 +27,11 @@
             <span class="text-sm text-muted-foreground">{{ formatDate(order.created_at) }}</span>
           </div>
           <p class="text-sm">Pemesan: <strong>{{ order.buyer_name }}</strong></p>
+          <p class="text-sm">
+            Meja: <strong>{{ order.table_number }}</strong>
+            &nbsp;·&nbsp;
+            Bayar: <strong>{{ order.payment_method === 'qris' ? 'QRIS' : 'Cash' }}</strong>
+          </p>
           <div class="flex gap-2 flex-wrap">
             <StatusBadge :status="order.order_status" type="order" />
             <StatusBadge :status="order.payment_status" type="payment" />
@@ -43,7 +48,7 @@
               :key="i"
               class="flex justify-between text-sm"
             >
-              <span>{{ item.menu_name }} × {{ item.quantity }}</span>
+              <span>{{ item.menu_name_snapshot }} × {{ item.quantity }}</span>
               <span>{{ formatRupiah(item.subtotal) }}</span>
             </div>
           </div>
@@ -53,13 +58,18 @@
           </div>
         </div>
 
-        <!-- Upload proof link (only when pending payment) -->
-        <div v-if="order.payment_status === 'pending_payment'" class="border rounded-lg p-4 bg-yellow-50">
-          <p class="text-sm font-medium mb-2">Belum ada bukti pembayaran yang diunggah.</p>
-          <RouterLink
-            :to="`/order/${order.order_number}/proof`"
-            class="text-sm text-primary underline"
-          >Upload Bukti Pembayaran →</RouterLink>
+        <!-- Status info for terminal states -->
+        <div
+          v-if="order.order_status === 'completed'"
+          class="border rounded-lg p-4 bg-green-50 text-sm text-green-800"
+        >
+          ✅ Pesanan selesai. Terima kasih sudah memesan!
+        </div>
+        <div
+          v-else-if="order.order_status === 'cancelled'"
+          class="border rounded-lg p-4 bg-red-50 text-sm text-red-800"
+        >
+          ❌ Pesanan dibatalkan.
         </div>
       </template>
     </main>
@@ -67,7 +77,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { trackOrder } from '@/lib/api'
 import type { OrderTrackResponse } from '@/types/api'
@@ -84,6 +94,9 @@ const token = route.params.token as string
 const order = ref<OrderTrackResponse | null>(null)
 const loading = ref(false)
 const error = ref<string | null>(null)
+
+// Terminal statuses: stop polling once reached
+const TERMINAL = new Set(['completed', 'cancelled'])
 
 async function load() {
   loading.value = true
@@ -103,5 +116,30 @@ async function load() {
   }
 }
 
-onMounted(load)
+// Polling — every 5 s, stops when page hidden or terminal status reached
+let pollTimer: ReturnType<typeof setTimeout> | null = null
+
+function schedulePoll() {
+  pollTimer = setTimeout(async () => {
+    if (document.hidden) {
+      schedulePoll()
+      return
+    }
+    await load()
+    if (!order.value || !TERMINAL.has(order.value.order_status)) {
+      schedulePoll()
+    }
+  }, 5000)
+}
+
+onMounted(async () => {
+  await load()
+  if (!order.value || !TERMINAL.has(order.value.order_status)) {
+    schedulePoll()
+  }
+})
+
+onUnmounted(() => {
+  if (pollTimer !== null) clearTimeout(pollTimer)
+})
 </script>

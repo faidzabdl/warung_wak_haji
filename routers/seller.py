@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, File, Query, UploadFile
+from fastapi import APIRouter, Depends, Query
 
 from dependencies.auth import require_seller
 from schemas.menu import AvailabilityUpdate, ImageUploadResponse, MenuCreate, MenuResponse, MenuUpdate
@@ -7,10 +7,11 @@ from schemas.seller_order import (
     HistoryResponse,
     OrderDetailResponse,
     OrderListItem,
-    PaymentRejectRequest,
+    RejectRequest,
 )
 from services.menu_service import (
     create_menu,
+    delete_menu,
     get_all_menus_for_seller,
     set_availability,
     update_menu,
@@ -22,10 +23,12 @@ from services.seller_order_service import (
     get_history,
     get_order_detail,
     list_active_orders,
+    mark_ready,
     reject_payment,
     start_processing,
     verify_payment,
 )
+from fastapi import File, UploadFile
 
 router = APIRouter(tags=["Seller"])
 
@@ -81,10 +84,18 @@ async def set_availability_endpoint(
     return await set_availability(menu_id, data.is_available)
 
 
+@router.delete("/seller/menus/{menu_id}", status_code=204)
+async def delete_menu_endpoint(
+    menu_id: str,
+    _uid: str = Depends(require_seller),
+):
+    """Soft-delete a menu (sets is_active=False). (Seller only)"""
+    await delete_menu(menu_id)
+
+
 # ---------------------------------------------------------------------------
 # Order management
 # NOTE: /seller/orders must be registered before /seller/orders/{order_number}
-# to prevent "orders" literal being consumed as a path parameter.
 # ---------------------------------------------------------------------------
 
 
@@ -92,7 +103,7 @@ async def set_availability_endpoint(
 async def list_active_orders_endpoint(
     _uid: str = Depends(require_seller),
 ):
-    """List all active orders (awaiting_payment / waiting_processing / processing). (Seller only)"""
+    """List all active orders (awaiting_payment / waiting_processing / processing / ready). (Seller only)"""
     return await list_active_orders()
 
 
@@ -101,7 +112,7 @@ async def get_order_detail_endpoint(
     order_number: str,
     _uid: str = Depends(require_seller),
 ):
-    """Get order detail including signed payment proof URL. (Seller only)"""
+    """Get order detail. (Seller only)"""
     return await get_order_detail(order_number)
 
 
@@ -110,20 +121,28 @@ async def verify_payment_endpoint(
     order_number: str,
     seller_uid: str = Depends(require_seller),
 ):
-    """Confirm payment for an order. (Seller only)"""
+    """Confirm QRIS payment (awaiting_payment → processing). (Seller only)"""
     order = await verify_payment(order_number, seller_uid)
-    return {"order_number": order["order_number"], "order_status": order["order_status"], "payment_status": order["payment_status"]}
+    return {
+        "order_number": order["order_number"],
+        "order_status": order["order_status"],
+        "payment_status": order["payment_status"],
+    }
 
 
 @router.post("/seller/orders/{order_number}/reject-payment")
 async def reject_payment_endpoint(
     order_number: str,
-    data: PaymentRejectRequest,
+    data: RejectRequest,
     seller_uid: str = Depends(require_seller),
 ):
-    """Reject payment for an order (with reason). (Seller only)"""
+    """Reject QRIS payment (awaiting_payment → cancelled). reason is optional. (Seller only)"""
     order = await reject_payment(order_number, data.reason, seller_uid)
-    return {"order_number": order["order_number"], "order_status": order["order_status"], "payment_status": order["payment_status"]}
+    return {
+        "order_number": order["order_number"],
+        "order_status": order["order_status"],
+        "payment_status": order["payment_status"],
+    }
 
 
 @router.post("/seller/orders/{order_number}/start-processing")
@@ -131,8 +150,18 @@ async def start_processing_endpoint(
     order_number: str,
     seller_uid: str = Depends(require_seller),
 ):
-    """Advance order to processing state. (Seller only)"""
+    """Advance order to processing state (waiting_processing → processing). (Seller only)"""
     order = await start_processing(order_number, seller_uid)
+    return {"order_number": order["order_number"], "order_status": order["order_status"]}
+
+
+@router.post("/seller/orders/{order_number}/mark-ready")
+async def mark_ready_endpoint(
+    order_number: str,
+    seller_uid: str = Depends(require_seller),
+):
+    """Advance order to ready state (processing → ready). (Seller only)"""
+    order = await mark_ready(order_number, seller_uid)
     return {"order_number": order["order_number"], "order_status": order["order_status"]}
 
 
@@ -141,9 +170,13 @@ async def complete_order_endpoint(
     order_number: str,
     seller_uid: str = Depends(require_seller),
 ):
-    """Mark an order as completed. (Seller only)"""
+    """Mark order as completed (ready → completed). Cash orders also set payment_status=paid. (Seller only)"""
     order = await complete_order(order_number, seller_uid)
-    return {"order_number": order["order_number"], "order_status": order["order_status"]}
+    return {
+        "order_number": order["order_number"],
+        "order_status": order["order_status"],
+        "payment_status": order.get("payment_status"),
+    }
 
 
 @router.post("/seller/orders/{order_number}/cancel")
@@ -152,7 +185,7 @@ async def cancel_order_endpoint(
     data: CancelRequest,
     seller_uid: str = Depends(require_seller),
 ):
-    """Cancel an order (with reason). (Seller only)"""
+    """Cancel an order (awaiting_payment or waiting_processing only). reason is optional. (Seller only)"""
     order = await cancel_order(order_number, data.reason, seller_uid)
     return {"order_number": order["order_number"], "order_status": order["order_status"]}
 
@@ -166,7 +199,7 @@ async def get_history_endpoint(
     date_to: str | None = Query(None),
     _uid: str = Depends(require_seller),
 ):
-    """Paginated history of completed/cancelled orders with filters. (Seller only)"""
+    """Paginated history of completed/cancelled orders with summary stats. (Seller only)"""
     return await get_history(
         page=page,
         page_size=page_size,

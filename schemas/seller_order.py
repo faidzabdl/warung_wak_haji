@@ -4,9 +4,9 @@ from pydantic import BaseModel, ConfigDict, field_validator
 
 
 class OrderItemDetail(BaseModel):
-    menu_name: str
-    menu_price: Decimal
-    quantity: int
+    menu_type: str
+    name: str
+    qty: int
     subtotal: Decimal
     menu_id: str | None  # may be null if menu deleted
 
@@ -14,6 +14,8 @@ class OrderItemDetail(BaseModel):
 class OrderListItem(BaseModel):
     order_number: str
     buyer_name: str
+    table_number: str
+    payment_method: str
     order_status: str
     payment_status: str
     total_amount: Decimal
@@ -24,51 +26,40 @@ class OrderListItem(BaseModel):
 class OrderDetailResponse(BaseModel):
     order_number: str
     buyer_name: str
+    table_number: str
+    payment_method: str
     notes: str | None
     order_status: str
     payment_status: str
     total_amount: Decimal
     items: list[OrderItemDetail]
-    payment_proof_url: str | None  # signed URL, 1-hour expiry; None if not uploaded
     cancel_reason: str | None
-    reject_reason: str | None
     created_at: str
     updated_at: str
 
 
-class PaymentRejectRequest(BaseModel):
-    reason: str  # required, non-empty
-    model_config = ConfigDict(extra="forbid")
+class RejectRequest(BaseModel):
+    reason: str | None = None
 
-    @field_validator("reason")
-    @classmethod
-    def reason_not_empty(cls, v: str) -> str:
-        if not v or not v.strip():
-            raise ValueError("reason must not be empty")
-        return v
+    model_config = ConfigDict(extra="forbid")
 
 
 class CancelRequest(BaseModel):
-    reason: str  # required, non-empty
-    model_config = ConfigDict(extra="forbid")
+    reason: str | None = None
 
-    @field_validator("reason")
-    @classmethod
-    def reason_not_empty(cls, v: str) -> str:
-        if not v or not v.strip():
-            raise ValueError("reason must not be empty")
-        return v
+    model_config = ConfigDict(extra="forbid")
 
 
 class HistoryItem(BaseModel):
     order_number: str
     buyer_name: str
+    table_number: str
+    payment_method: str
     order_status: str
     payment_status: str
     total_amount: Decimal
     items: list[OrderItemDetail]
     cancel_reason: str | None
-    reject_reason: str | None
     created_at: str
 
 
@@ -77,3 +68,6 @@ class HistoryResponse(BaseModel):
     total: int
     page: int
     page_size: int
+    total_revenue: Decimal
+    completed_count: int
+    cancelled_count: int
