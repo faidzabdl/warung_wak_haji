@@ -218,11 +218,8 @@ const CATS_BY_TYPE: Record<string, string[]> = {
 }
 
 const cats = computed(() => {
-  const s = new Set<string>()
-  menus.value
-    .filter(m => filterType.value === 'Semua' || m.menu_type === filterType.value)
-    .forEach(m => s.add(m.category))
-  return ['Semua', ...Array.from(s)]
+  if (filterType.value === 'Semua') return ['Semua', 'Main Dish', 'Side Dish', 'Coffee', 'Non Coffee']
+  return ['Semua', ...(CATS_BY_TYPE[filterType.value] ?? [])]
 })
 
 const draftCatOptions = computed(() =>
