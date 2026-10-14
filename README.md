@@ -878,36 +878,76 @@ pending_verification  → rejected               (seller rejects) → order beco
 
 ---
 
-## 9. Deployment
+## 9. Deployment ke Render.com
 
-### Railway (FastAPI Backend)
+Aplikasi ini di-deploy menggunakan **Render Blueprint** (`render.yaml`) — satu file yang mendefinisikan backend dan frontend sekaligus.
 
-1. Connect your GitHub repository to [Railway](https://railway.app).
-2. Railway auto-detects Python. Set the **start command** in Railway settings:
-   ```
-   uvicorn main:app --host 0.0.0.0 --port $PORT
-   ```
-3. Add all **seven environment variables** in Railway → Settings → Variables:
-   - `SUPABASE_URL`
-   - `SUPABASE_ANON_KEY`
-   - `SUPABASE_SERVICE_ROLE_KEY` ← **keep this secret, never commit to Git**
-   - `SUPABASE_JWT_SECRET`
-   - `ALLOWED_SELLER_UID`
-   - `ALLOWED_ORIGINS`
-   - `ENVIRONMENT`
-4. Set `ENVIRONMENT=production`.
-5. Set `ALLOWED_ORIGINS` to your Vercel frontend URL (e.g. `https://your-app.vercel.app`).
+### Prasyarat
 
-> ⚠️ Double-check `ALLOWED_SELLER_UID` after every deploy — an incorrect value means either the seller cannot log in or the wrong Supabase user gains seller access.
+- Repo sudah di GitHub (public atau private)
+- Akun [Render.com](https://render.com) (gratis)
+- Project Supabase sudah jalan dan migration sudah dijalankan (lihat [Bagian 5](#5-database-setup))
+- Kamu punya nilai untuk semua env var (lihat [Bagian 4](#4-environment-variables))
 
-### Vercel (Vue 3 Frontend — Future)
+---
 
-1. Connect your frontend repository to [Vercel](https://vercel.com).
-2. Add these environment variables in Vercel → Settings → Environment Variables:
-   - `VITE_SUPABASE_URL` — your Supabase project URL
-   - `VITE_SUPABASE_ANON_KEY` — the public anon key
-   - `VITE_API_BASE_URL` — your Railway backend URL
-3. **Never add `SUPABASE_SERVICE_ROLE_KEY` to Vercel.** It belongs only on the Railway backend.
+### Langkah Deploy
+
+#### 1. Deploy via Blueprint
+
+1. Buka [render.com/dashboard](https://dashboard.render.com)
+2. Klik **New → Blueprint**
+3. Pilih GitHub repo ini
+4. Render membaca `render.yaml` dan menampilkan preview **2 service**: `warung-backend` dan `warung-frontend`
+5. Klik **Apply** — kedua service mulai build
+
+#### 2. Isi env var backend (`warung-backend`)
+
+Buka **Dashboard → warung-backend → Environment** dan isi:
+
+| Variable | Nilai | Cara mendapatkan |
+|---|---|---|
+| `SUPABASE_URL` | `https://xxxx.supabase.co` | Supabase Dashboard → Settings → API → Project URL |
+| `SUPABASE_ANON_KEY` | `eyJ...` | Supabase Dashboard → Settings → API → anon public |
+| `SUPABASE_SERVICE_ROLE_KEY` | `eyJ...` | Supabase Dashboard → Settings → API → service_role ⚠️ rahasia |
+| `SUPABASE_JWT_SECRET` | string panjang | Supabase Dashboard → Settings → API → JWT Secret |
+| `ALLOWED_SELLER_UID` | UUID | Supabase Dashboard → Authentication → Users → copy UID seller |
+| `ALLOWED_ORIGINS` | `https://warung-frontend.onrender.com` | URL frontend dari langkah 3 |
+
+Setelah isi, klik **Save Changes** → Render otomatis redeploy backend.
+
+#### 3. Isi env var frontend (`warung-frontend`)
+
+Buka **Dashboard → warung-frontend → Environment** dan isi:
+
+| Variable | Nilai | Cara mendapatkan |
+|---|---|---|
+| `VITE_SUPABASE_URL` | `https://xxxx.supabase.co` | Sama seperti `SUPABASE_URL` di backend |
+| `VITE_SUPABASE_ANON_KEY` | `eyJ...` | Sama seperti `SUPABASE_ANON_KEY` di backend |
+| `VITE_API_URL` | `https://warung-backend.onrender.com` | URL backend dari langkah 2 |
+
+Setelah isi, klik **Save Changes** → Render otomatis rebuild frontend.
+
+> ⚠️ **Jangan pernah** masukkan `SUPABASE_SERVICE_ROLE_KEY` ke env var frontend. Key ini hanya untuk backend.
+
+#### 4. Cari tahu URL masing-masing service
+
+Setelah deploy pertama selesai, Render menampilkan URL di halaman service:
+- Backend: `https://warung-backend.onrender.com` (atau nama yang kamu pilih)
+- Frontend: `https://warung-frontend.onrender.com`
+
+Gunakan kedua URL ini untuk mengisi `ALLOWED_ORIGINS` (backend) dan `VITE_API_URL` (frontend) di langkah 2–3.
+
+---
+
+### Catatan Free Tier Render
+
+| Service | Free Tier |
+|---|---|
+| Web Service (backend) | 750 jam/bulan, **spin down setelah 15 menit idle** — request pertama setelah idle ~30 detik |
+| Static Site (frontend) | Gratis selamanya, tidak ada spin down |
+
+> Jika spin down backend mengganggu, pertimbangkan upgrade ke **Render Starter ($7/bulan)** untuk always-on.
 
 ### Supabase Free Tier Limits
 
@@ -918,7 +958,7 @@ pending_verification  → rejected               (seller rejects) → order beco
 | Monthly active users | 50,000 |
 | Bandwidth | 2 GB / month |
 
-Monitor usage in **Supabase Dashboard → Reports**.
+Monitor usage di **Supabase Dashboard → Reports**.
 
 ---
 

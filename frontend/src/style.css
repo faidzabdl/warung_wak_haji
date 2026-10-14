@@ -98,20 +98,6 @@
     --sidebar-ring: #7a1d12;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --bg: #241a10; --ink: #f3e6c6; --brand: #85582f; --brand-dark: #5a3b20;
-    --line: #b0452f; --on-brand: #fbf1da; --field: #33261a; --wwh-muted: #a69473;
-    --background: #241a10; --foreground: #f3e6c6; --card: #33261a;
-    --card-foreground: #f3e6c6; --popover: #33261a; --popover-foreground: #f3e6c6;
-    --primary: #85582f; --primary-foreground: #fbf1da;
-    --secondary: #3f2a1a; --secondary-foreground: #f3e6c6;
-    --muted: #3f2a1a; --muted-foreground: #a69473;
-    --accent: #5a3b20; --accent-foreground: #f3e6c6;
-    --destructive: #b0452f; --border: #b0452f; --input: #33261a; --ring: #b0452f;
-  }
-}
-
 /* ─── Base reset ─────────────────────────────────────────────────────────── */
 @layer base {
   *, *::before, *::after { box-sizing: border-box; }
@@ -158,7 +144,7 @@
 @media (min-width: 640px) { .menu-grid { grid-template-columns: repeat(3,1fr); gap: 26px; } }
 @media (min-width: 960px) { .menu-grid { grid-template-columns: repeat(4,1fr); } }
 
-.wwh-card { display: flex; flex-direction: column; border: 1.5px solid var(--line); border-radius: 32px; padding: 10px 10px 16px; min-width: 0; transition: transform .2s, box-shadow .2s; background: var(--card); }
+.wwh-card { display: flex; flex-direction: column; border: 1.5px solid var(--line); border-radius: 32px; padding: 10px 10px 16px; min-width: 0; transition: transform .2s, box-shadow .2s; background: var(--bg); }
 @media (hover: hover) { .wwh-card:hover { transform: translateY(-3px); box-shadow: 0 10px 22px rgba(90,40,10,.18); } }
 .wwh-card.off .thumb { opacity: .4; }
 

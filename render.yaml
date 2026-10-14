@@ -1,0 +1,51 @@
+services:
+
+  # ─── Backend — FastAPI + Uvicorn ───────────────────────────────────────────
+  - type: web
+    name: warung-backend
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      # Isi nilai berikut di Render Dashboard → warung-backend → Environment
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: SUPABASE_JWT_SECRET
+        sync: false
+      - key: ALLOWED_SELLER_UID
+        sync: false
+      # Isi dengan URL frontend setelah deploy pertama, contoh:
+      # https://warung-frontend.onrender.com
+      - key: ALLOWED_ORIGINS
+        sync: false
+
+  # ─── Frontend — Vue 3 Static Site ──────────────────────────────────────────
+  - type: static
+    name: warung-frontend
+    buildCommand: cd frontend && npm ci && npm run build
+    staticPublishPath: frontend/dist
+    plan: free
+    routes:
+      # SPA fallback — semua path dikembalikan ke index.html
+      # (diperlukan karena Vue Router pakai history mode)
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      # Isi nilai berikut di Render Dashboard → warung-frontend → Environment
+      - key: VITE_SUPABASE_URL
+        sync: false
+      - key: VITE_SUPABASE_ANON_KEY
+        sync: false
+      # Isi dengan URL backend setelah deploy pertama, contoh:
+      # https://warung-backend.onrender.com
+      - key: VITE_API_URL
+        sync: false
