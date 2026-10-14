@@ -181,17 +181,9 @@
         </template>
       </section>
 
-      <!-- Edit menu → link to proper seller page -->
-      <section v-else aria-label="Edit menu" class="flex flex-col items-center justify-center py-16 gap-3 text-center">
-        <p class="font-semibold">Kelola Menu</p>
-        <p class="text-sm" style="color:var(--wwh-muted)">Untuk mengelola menu secara lengkap, gunakan halaman Kelola Menu.</p>
-        <RouterLink
-          to="/seller/menus"
-          class="submit"
-          style="display:inline-block;text-decoration:none;padding:9px 28px"
-        >
-          Kelola Menu →
-        </RouterLink>
+      <!-- Edit menu → embedded inline -->
+      <section v-else aria-label="Edit menu">
+        <SellerMenuPage />
       </section>
 
       <div class="snav-space" aria-hidden="true"></div>
@@ -202,6 +194,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useAuthStore } from '@/stores/auth'
+import SellerMenuPage from '@/pages/seller/SellerMenuPage.vue'
 import {
   getSellerOrders, getOrderDetail,
   verifyPayment, rejectPayment, startProcessing, markReady, completeOrder, cancelOrder,

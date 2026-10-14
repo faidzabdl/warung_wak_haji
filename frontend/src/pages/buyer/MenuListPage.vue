@@ -1,7 +1,7 @@
 <template>
   <main class="wrap">
-    <!-- Role switch -->
-    <div class="roles" role="tablist" aria-label="Mode tampilan">
+    <!-- Role switch — hanya tampil jika sudah login sebagai seller -->
+    <div v-if="authStore.isLoggedIn" class="roles" role="tablist" aria-label="Mode tampilan">
       <button
         v-for="r in ROLES" :key="r.id" type="button" role="tab"
         :class="{ on: role === r.id }"
@@ -209,6 +209,7 @@
 import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { createOrder, trackOrder, getMenus } from '@/lib/api'
 import { ApiError, type MenuResponse } from '@/types/api'
+import { useAuthStore } from '@/stores/auth'
 import SellerApp from '@/components/seller/SellerApp.vue'
 import QrDummy from '@/components/buyer/QrDummy.vue'
 
@@ -231,6 +232,7 @@ const STATUS_INFO: Record<string, { label: string; note: string }> = {
 }
 
 // ── State ─────────────────────────────────────────────────────────────────
+const authStore = useAuthStore()
 const role = ref<'pembeli' | 'penjual'>('pembeli')
 const menus = ref<MenuResponse[]>([])
 const loading = ref(true)
@@ -270,6 +272,7 @@ const CATS_BY_TYPE: Record<string, string[]> = {
 }
 
 const cats = computed(() => ['Semua', ...(CATS_BY_TYPE[activeType.value] ?? [])])
+
 
 const filteredMenus = computed(() =>
   menus.value.filter(m =>
@@ -422,6 +425,8 @@ function startStatusPoll() {
 
 // ── Load menus ────────────────────────────────────────────────────────────
 onMounted(async () => {
+  // Init auth session agar toggle Pembeli/Penjual muncul jika sudah login
+  if (authStore.loading) await authStore.init()
   try {
     menus.value = await getMenus()
   } catch (e) {

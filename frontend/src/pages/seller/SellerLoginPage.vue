@@ -49,7 +49,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import { useAuthStore } from '@/stores/auth'
@@ -66,10 +66,11 @@ const password = ref('')
 const loading = ref(false)
 const error = ref<string | null>(null)
 
-// Redirect if already logged in
-if (authStore.isLoggedIn) {
-  router.replace('/seller/orders')
-}
+// Tunggu session selesai diload, baru redirect jika sudah login
+onMounted(async () => {
+  if (authStore.loading) await authStore.init()
+  if (authStore.isLoggedIn) router.replace('/')
+})
 
 async function login() {
   error.value = null
@@ -81,7 +82,7 @@ async function login() {
   try {
     await authStore.login(email.value, password.value)
     toast.success('Login berhasil!')
-    router.push('/seller/orders')
+    router.push('/')
   } catch (e: unknown) {
     error.value = e instanceof Error ? e.message : 'Login gagal.'
   } finally {
