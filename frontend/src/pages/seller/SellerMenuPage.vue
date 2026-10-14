@@ -123,16 +123,27 @@
         </div>
         <div class="mf">
           <label for="f-cat">Kategori</label>
-          <input
-            id="f-cat"
-            v-model="draft.category"
-            list="cat-list"
-            maxlength="20"
-            placeholder="mis. Nasi, Ayam"
-          />
-          <datalist id="cat-list">
-            <option v-for="c in allCats" :key="c" :value="c"></option>
-          </datalist>
+          <div class="dd" :class="{ open: catDraftOpen }" style="position:relative">
+            <button
+              id="f-cat"
+              class="dd-btn"
+              type="button"
+              style="width:100%"
+              @click="catDraftOpen = !catDraftOpen"
+              aria-haspopup="listbox"
+            >
+              {{ draft.category || 'Pilih kategori…' }}<i class="caret"></i>
+            </button>
+            <ul v-if="catDraftOpen" class="dd-menu" role="listbox" style="width:100%">
+              <li
+                v-for="c in draftCatOptions"
+                :key="c"
+                role="option"
+                :class="{ on: draft.category === c }"
+                @click="draft.category = c; catDraftOpen = false"
+              >{{ c }}</li>
+            </ul>
+          </div>
         </div>
         <div class="mf">
           <span>Tersedia</span>
@@ -196,6 +207,7 @@ const draft = ref<null | {
 }>(null)
 const draftError = ref('')
 const saving = ref(false)
+const catDraftOpen = ref(false)
 const toastMsg = ref('')
 let toastTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -208,7 +220,15 @@ const cats = computed(() => {
   return ['Semua', ...Array.from(s)]
 })
 
-const allCats = computed(() => [...new Set(menus.value.map(m => m.category))])
+const CATS_BY_TYPE: Record<string, string[]> = {
+  Makanan: ['Main Dish', 'Side Dish'],
+  Minuman: ['Coffee', 'Non Coffee'],
+}
+
+const draftCatOptions = computed(() =>
+  draft.value ? (CATS_BY_TYPE[draft.value.menu_type] ?? []) : []
+)
+
 
 const filteredMenus = computed(() =>
   menus.value.filter(m =>
@@ -219,6 +239,12 @@ const filteredMenus = computed(() =>
 
 watch(cats, (newCats) => {
   if (!newCats.includes(filterCat.value)) filterCat.value = 'Semua'
+})
+
+// Reset kategori & tutup dropdown saat jenis menu berubah di form
+watch(() => draft.value?.menu_type, () => {
+  if (draft.value) draft.value.category = ''
+  catDraftOpen.value = false
 })
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

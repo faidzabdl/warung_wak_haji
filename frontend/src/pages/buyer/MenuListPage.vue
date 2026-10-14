@@ -207,8 +207,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
-import { createOrder } from '@/lib/api'
-import { getMenus } from '@/lib/api'
+import { createOrder, trackOrder, getMenus } from '@/lib/api'
 import { ApiError, type MenuResponse } from '@/types/api'
 import SellerApp from '@/components/seller/SellerApp.vue'
 import QrDummy from '@/components/buyer/QrDummy.vue'
@@ -256,6 +255,8 @@ const tried = ref(false)
 const busy = ref(false)
 const draft = ref<null | { nama: string; meja: string; payment_method: string; lines: any[]; total: number }>(null)
 const lastOrder = ref<any>(null)
+let lastOrderToken = ''
+let pollTimer: ReturnType<typeof setInterval> | null = null
 const toast = ref('')
 let toastTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -375,6 +376,7 @@ async function confirmOrder() {
 
     if (status === 201) {
       const res = data as any
+      lastOrderToken = res.tracking_token
       lastOrder.value = {
         order_number: res.order_number,
         table_number: savedDraft.meja,
@@ -383,6 +385,7 @@ async function confirmOrder() {
         payment_method: savedDraft.payment_method,
         order_status: savedDraft.payment_method === 'qris' ? 'awaiting_payment' : 'waiting_processing',
       }
+      startStatusPoll()
       showToast(
         lastOrder.value.payment_method === 'cash'
           ? `Pesanan berhasil dibuat! Pembayaran tunai ke kasir untuk meja ${lastOrder.value.table_number}.`
@@ -400,6 +403,22 @@ async function confirmOrder() {
   }
 }
 
+// ── Poll status lastOrder ─────────────────────────────────────────────────
+function startStatusPoll() {
+  if (pollTimer) clearInterval(pollTimer)
+  pollTimer = setInterval(async () => {
+    if (!lastOrderToken || document.hidden) return
+    try {
+      const track = await trackOrder(lastOrderToken)
+      if (lastOrder.value) lastOrder.value.order_status = track.order_status
+      if (track.order_status === 'completed' || track.order_status === 'cancelled') {
+        clearInterval(pollTimer!)
+        pollTimer = null
+      }
+    } catch { /* silent */ }
+  }, 5_000)
+}
+
 // ── Load menus ────────────────────────────────────────────────────────────
 onMounted(async () => {
   try {
@@ -409,6 +428,10 @@ onMounted(async () => {
   } finally {
     loading.value = false
   }
+})
+
+onBeforeUnmount(() => {
+  if (pollTimer) clearInterval(pollTimer)
 })
 </script>
 
