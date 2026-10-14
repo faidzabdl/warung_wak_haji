@@ -264,11 +264,12 @@ let toastTimer: ReturnType<typeof setTimeout> | null = null
 const pendingCount = ref(0)
 
 // ── Computed ──────────────────────────────────────────────────────────────
-const cats = computed(() => {
-  const s = new Set<string>()
-  menus.value.filter(m => m.menu_type === activeType.value).forEach(m => s.add(m.category))
-  return ['Semua', ...Array.from(s)]
-})
+const CATS_BY_TYPE: Record<string, string[]> = {
+  Makanan: ['Main Dish', 'Side Dish'],
+  Minuman: ['Coffee', 'Non Coffee'],
+}
+
+const cats = computed(() => ['Semua', ...(CATS_BY_TYPE[activeType.value] ?? [])])
 
 const filteredMenus = computed(() =>
   menus.value.filter(m =>

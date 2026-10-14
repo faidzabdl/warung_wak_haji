@@ -212,18 +212,15 @@ const toastMsg = ref('')
 let toastTimer: ReturnType<typeof setTimeout> | null = null
 
 // ── Computed ─────────────────────────────────────────────────────────────────
-const cats = computed(() => {
-  const s = new Set<string>()
-  menus.value
-    .filter(m => filterType.value === 'Semua' || m.menu_type === filterType.value)
-    .forEach(m => s.add(m.category))
-  return ['Semua', ...Array.from(s)]
-})
-
 const CATS_BY_TYPE: Record<string, string[]> = {
   Makanan: ['Main Dish', 'Side Dish'],
   Minuman: ['Coffee', 'Non Coffee'],
 }
+
+const cats = computed(() => {
+  if (filterType.value === 'Semua') return ['Semua', 'Main Dish', 'Side Dish', 'Coffee', 'Non Coffee']
+  return ['Semua', ...(CATS_BY_TYPE[filterType.value] ?? [])]
+})
 
 const draftCatOptions = computed(() =>
   draft.value ? (CATS_BY_TYPE[draft.value.menu_type] ?? []) : []
