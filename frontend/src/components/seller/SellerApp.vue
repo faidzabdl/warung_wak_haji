@@ -26,7 +26,7 @@
           role="tab"
           :class="{ on: tab === t.id }"
           :aria-selected="tab === t.id"
-          @click="tab = t.id"
+          @click="tab = (t.id as 'orders' | 'history' | 'edit')"
         >
           <span class="ni" v-html="t.icon"></span>
           <span>{{ t.label }}</span>

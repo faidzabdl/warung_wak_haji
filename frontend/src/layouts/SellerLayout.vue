@@ -64,7 +64,6 @@ import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { getSellerOrders } from '@/lib/api'
-import { ApiError } from '@/types/api'
 
 const authStore = useAuthStore()
 const router = useRouter()

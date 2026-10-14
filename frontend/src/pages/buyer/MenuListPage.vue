@@ -6,7 +6,7 @@
         v-for="r in ROLES" :key="r.id" type="button" role="tab"
         :class="{ on: role === r.id }"
         :aria-selected="role === r.id"
-        @click="role = r.id"
+        @click="role = (r.id as 'pembeli' | 'penjual')"
       >
         {{ r.label }}
         <i v-if="r.id === 'penjual' && pendingCount > 0" class="cnt">{{ pendingCount }}</i>
@@ -357,11 +357,12 @@ function closeDraft() { if (!busy.value) draft.value = null }
 async function confirmOrder() {
   if (!draft.value) return
   busy.value = true
+  const savedDraft = draft.value
   try {
     const { data, status } = await createOrder({
-      buyer_name: draft.value.nama,
-      table_number: draft.value.meja,
-      payment_method: draft.value.payment_method as 'qris' | 'cash',
+      buyer_name: savedDraft.nama,
+      table_number: savedDraft.meja,
+      payment_method: savedDraft.payment_method as 'qris' | 'cash',
       items: lines.value.map(l => ({ menu_id: l.id, quantity: l.qty })),
     })
 
@@ -376,11 +377,11 @@ async function confirmOrder() {
       const res = data as any
       lastOrder.value = {
         order_number: res.order_number,
-        table_number: draft.value?.meja ?? meja.value,
+        table_number: savedDraft.meja,
         item_count: lines.value.reduce((s, l) => s + l.qty, 0),
         total_amount: res.total_amount,
-        payment_method: draft.value?.payment_method ?? payMethod.value,
-        order_status: draft.value?.payment_method === 'qris' ? 'awaiting_payment' : 'waiting_processing',
+        payment_method: savedDraft.payment_method,
+        order_status: savedDraft.payment_method === 'qris' ? 'awaiting_payment' : 'waiting_processing',
       }
       showToast(
         lastOrder.value.payment_method === 'cash'

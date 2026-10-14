@@ -184,7 +184,6 @@ const duplicateResult = ref<OrderDuplicateResponse | null>(null)
 
 // Generated once per checkout session — prevents duplicates on retry
 const idempotencyKey = crypto.randomUUID()
-let createdOrderNumber = ''
 let createdTrackingToken = ''
 
 const paymentMethodLabel = computed(() =>
@@ -240,7 +239,6 @@ async function submit() {
     if (status === 201) {
       const res = data as OrderCreateResponse
       orderResult.value = res
-      createdOrderNumber = res.order_number
       createdTrackingToken = res.tracking_token
       cart.clear()
       toast.success('Pesanan berhasil dibuat!')
