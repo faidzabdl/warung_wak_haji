@@ -878,76 +878,100 @@ pending_verification  → rejected               (seller rejects) → order beco
 
 ---
 
-## 9. Deployment ke Render.com
+## 9. Deployment
 
-Aplikasi ini di-deploy menggunakan **Render Blueprint** (`render.yaml`) — satu file yang mendefinisikan backend dan frontend sekaligus.
+**Arsitektur:**
+- **Backend** → [Railway](https://railway.app) — gratis, tanpa kartu kredit
+- **Frontend** → [Render](https://render.com) Static Site — gratis selamanya, tanpa kartu kredit
+- **Database** → Supabase (tetap di sana)
 
 ### Prasyarat
 
 - Repo sudah di GitHub (public atau private)
-- Akun [Render.com](https://render.com) (gratis)
+- Akun Railway (gratis, daftar via GitHub)
+- Akun Render (gratis, daftar via GitHub)
 - Project Supabase sudah jalan dan migration sudah dijalankan (lihat [Bagian 5](#5-database-setup))
-- Kamu punya nilai untuk semua env var (lihat [Bagian 4](#4-environment-variables))
 
 ---
 
-### Langkah Deploy
+### Bagian A — Backend ke Railway
+
+#### 1. Buat project Railway
+
+1. Buka [railway.app](https://railway.app) → **New Project**
+2. Pilih **Deploy from GitHub repo** → pilih repo ini
+3. Railway auto-detect Python, langsung mulai build
+
+#### 2. Set start command
+
+Di Railway Dashboard → project kamu → **Settings → Deploy**:
+```
+uvicorn main:app --host 0.0.0.0 --port $PORT
+```
+
+#### 3. Isi env var backend
+
+Railway Dashboard → project → **Variables**, tambahkan satu per satu:
+
+| Variable | Nilai | Cara mendapatkan |
+|---|---|---|
+| `SUPABASE_URL` | `https://xxxx.supabase.co` | Supabase → Settings → API → Project URL |
+| `SUPABASE_ANON_KEY` | `eyJ...` | Supabase → Settings → API → anon public |
+| `SUPABASE_SERVICE_ROLE_KEY` | `eyJ...` | Supabase → Settings → API → service_role ⚠️ rahasia |
+| `SUPABASE_JWT_SECRET` | string panjang | Supabase → Settings → API → JWT Secret |
+| `ALLOWED_SELLER_UID` | UUID | Supabase → Authentication → Users → copy UID seller |
+| `ALLOWED_ORIGINS` | `https://warung-frontend.onrender.com` | URL frontend Render (dari Bagian B) |
+| `ENVIRONMENT` | `production` | — |
+
+Setelah semua diisi, Railway otomatis redeploy.
+
+#### 4. Catat URL backend
+
+Railway memberikan URL publik seperti: `https://warung-backend.up.railway.app`
+→ Simpan URL ini untuk dipakai di Bagian B.
+
+---
+
+### Bagian B — Frontend ke Render Static Site
 
 #### 1. Deploy via Blueprint
 
 1. Buka [render.com/dashboard](https://dashboard.render.com)
 2. Klik **New → Blueprint**
 3. Pilih GitHub repo ini
-4. Render membaca `render.yaml` dan menampilkan preview **2 service**: `warung-backend` dan `warung-frontend`
-5. Klik **Apply** — kedua service mulai build
+4. Render membaca `render.yaml` dan membuat service `warung-frontend`
+5. Klik **Apply** — build mulai
 
-#### 2. Isi env var backend (`warung-backend`)
+#### 2. Isi env var frontend
 
-Buka **Dashboard → warung-backend → Environment** dan isi:
-
-| Variable | Nilai | Cara mendapatkan |
-|---|---|---|
-| `SUPABASE_URL` | `https://xxxx.supabase.co` | Supabase Dashboard → Settings → API → Project URL |
-| `SUPABASE_ANON_KEY` | `eyJ...` | Supabase Dashboard → Settings → API → anon public |
-| `SUPABASE_SERVICE_ROLE_KEY` | `eyJ...` | Supabase Dashboard → Settings → API → service_role ⚠️ rahasia |
-| `SUPABASE_JWT_SECRET` | string panjang | Supabase Dashboard → Settings → API → JWT Secret |
-| `ALLOWED_SELLER_UID` | UUID | Supabase Dashboard → Authentication → Users → copy UID seller |
-| `ALLOWED_ORIGINS` | `https://warung-frontend.onrender.com` | URL frontend dari langkah 3 |
-
-Setelah isi, klik **Save Changes** → Render otomatis redeploy backend.
-
-#### 3. Isi env var frontend (`warung-frontend`)
-
-Buka **Dashboard → warung-frontend → Environment** dan isi:
+Render Dashboard → **warung-frontend → Environment**:
 
 | Variable | Nilai | Cara mendapatkan |
 |---|---|---|
-| `VITE_SUPABASE_URL` | `https://xxxx.supabase.co` | Sama seperti `SUPABASE_URL` di backend |
-| `VITE_SUPABASE_ANON_KEY` | `eyJ...` | Sama seperti `SUPABASE_ANON_KEY` di backend |
-| `VITE_API_URL` | `https://warung-backend.onrender.com` | URL backend dari langkah 2 |
+| `VITE_SUPABASE_URL` | `https://xxxx.supabase.co` | Sama seperti `SUPABASE_URL` |
+| `VITE_SUPABASE_ANON_KEY` | `eyJ...` | Sama seperti `SUPABASE_ANON_KEY` |
+| `VITE_API_URL` | `https://warung-backend.up.railway.app` | URL backend Railway dari Bagian A |
 
-Setelah isi, klik **Save Changes** → Render otomatis rebuild frontend.
+Klik **Save Changes** → Render otomatis rebuild frontend.
 
-> ⚠️ **Jangan pernah** masukkan `SUPABASE_SERVICE_ROLE_KEY` ke env var frontend. Key ini hanya untuk backend.
+> ⚠️ **Jangan pernah** masukkan `SUPABASE_SERVICE_ROLE_KEY` ke env var frontend.
 
-#### 4. Cari tahu URL masing-masing service
+#### 3. Update ALLOWED_ORIGINS di Railway
 
-Setelah deploy pertama selesai, Render menampilkan URL di halaman service:
-- Backend: `https://warung-backend.onrender.com` (atau nama yang kamu pilih)
-- Frontend: `https://warung-frontend.onrender.com`
-
-Gunakan kedua URL ini untuk mengisi `ALLOWED_ORIGINS` (backend) dan `VITE_API_URL` (frontend) di langkah 2–3.
+Setelah frontend Render selesai deploy dan kamu dapat URL-nya (misal `https://warung-frontend.onrender.com`):
+1. Kembali ke Railway → Variables
+2. Update `ALLOWED_ORIGINS` = URL frontend Render tersebut
+3. Railway redeploy otomatis
 
 ---
 
-### Catatan Free Tier Render
+### Catatan Free Tier
 
-| Service | Free Tier |
-|---|---|
-| Web Service (backend) | 750 jam/bulan, **spin down setelah 15 menit idle** — request pertama setelah idle ~30 detik |
-| Static Site (frontend) | Gratis selamanya, tidak ada spin down |
-
-> Jika spin down backend mengganggu, pertimbangkan upgrade ke **Render Starter ($7/bulan)** untuk always-on.
+| Platform | Layanan | Limit | Kartu? |
+|---|---|---|---|
+| Railway | Backend (Web Service) | $5 credit/bulan, ~500 jam | Tidak perlu |
+| Render | Frontend (Static Site) | Gratis selamanya | Tidak perlu |
+| Supabase | Database + Auth + Storage | 500MB DB, 1GB storage | Tidak perlu |
 
 ### Supabase Free Tier Limits
 

@@ -1,33 +1,7 @@
 services:
 
-  # ─── Backend — FastAPI + Uvicorn ───────────────────────────────────────────
-  - type: web
-    name: warung-backend
-    runtime: python
-    plan: free
-    buildCommand: pip install -r requirements.txt
-    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
-    healthCheckPath: /health
-    envVars:
-      - key: ENVIRONMENT
-        value: production
-      # Isi nilai berikut di Render Dashboard → warung-backend → Environment
-      - key: SUPABASE_URL
-        sync: false
-      - key: SUPABASE_ANON_KEY
-        sync: false
-      - key: SUPABASE_SERVICE_ROLE_KEY
-        sync: false
-      - key: SUPABASE_JWT_SECRET
-        sync: false
-      - key: ALLOWED_SELLER_UID
-        sync: false
-      # Isi dengan URL frontend setelah deploy pertama, contoh:
-      # https://warung-frontend.onrender.com
-      - key: ALLOWED_ORIGINS
-        sync: false
-
-  # ─── Frontend — Vue 3 Static Site ──────────────────────────────────────────
+  # ─── Frontend — Vue 3 Static Site (Render) ─────────────────────────────────
+  # Backend di-deploy terpisah di Railway (lihat README bagian 9)
   - type: static
     name: warung-frontend
     buildCommand: cd frontend && npm ci && npm run build
@@ -45,7 +19,6 @@ services:
         sync: false
       - key: VITE_SUPABASE_ANON_KEY
         sync: false
-      # Isi dengan URL backend setelah deploy pertama, contoh:
-      # https://warung-backend.onrender.com
+      # URL backend Railway, contoh: https://warung-backend.up.railway.app
       - key: VITE_API_URL
         sync: false
