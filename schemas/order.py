@@ -18,7 +18,7 @@ class OrderItemInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
-_TABLE_NUMBER_RE = re.compile(r"^\d{1,4}$")
+_TABLE_NUMBER_RE = re.compile(r"^[1-8]$")
 
 
 class OrderCreateRequest(BaseModel):
@@ -41,7 +41,7 @@ class OrderCreateRequest(BaseModel):
     def table_number_valid(cls, v: str) -> str:
         v = v.strip()
         if not _TABLE_NUMBER_RE.match(v):
-            raise ValueError("table_number must be 1–4 digits (e.g. '1', '12', '99')")
+            raise ValueError("table_number must be a number between 1 and 8")
         return v
 
     @field_validator("payment_method")

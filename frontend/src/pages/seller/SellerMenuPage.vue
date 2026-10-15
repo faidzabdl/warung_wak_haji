@@ -96,6 +96,21 @@
         <button class="x" type="button" aria-label="Tutup" @click="closeDraft">×</button>
         <h3 class="m-title">{{ draft.id ? 'Edit Menu' : 'Tambah Menu' }}</h3>
 
+        <!-- Foto menu -->
+        <div class="mf">
+          <span>Foto Menu</span>
+          <div class="img-upload" @click="triggerFileInput" :class="{ uploading: uploadingImg }">
+            <img v-if="draft.image_url" :src="draft.image_url" alt="Preview foto" class="img-preview" />
+            <div v-else class="img-placeholder">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="32" height="32"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+              <span>{{ uploadingImg ? 'Mengupload…' : 'Tambah Foto' }}</span>
+            </div>
+            <div v-if="draft.image_url" class="img-change-label">Ganti Foto</div>
+          </div>
+          <input ref="fileInputRef" type="file" accept="image/jpeg,image/png,image/webp" style="display:none" @change="onFileChange" />
+          <p v-if="uploadError" class="err-msg" style="margin:4px 0 0">{{ uploadError }}</p>
+        </div>
+
         <div class="mf">
           <label for="f-name">Nama menu</label>
           <input id="f-name" v-model="draft.name" maxlength="40" placeholder="Typing.." />
@@ -173,7 +188,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
-import { getSellerMenus, createMenu, updateMenu, setMenuAvailability, deleteMenu } from '@/lib/api'
+import { getSellerMenus, createMenu, updateMenu, setMenuAvailability, deleteMenu, uploadMenuImage } from '@/lib/api'
 import { ApiError, type MenuResponse } from '@/types/api'
 import { useAuthStore } from '@/stores/auth'
 
@@ -208,6 +223,9 @@ const draft = ref<null | {
 const draftError = ref('')
 const saving = ref(false)
 const catDraftOpen = ref(false)
+const uploadingImg = ref(false)
+const uploadError = ref('')
+const fileInputRef = ref<HTMLInputElement | null>(null)
 const toastMsg = ref('')
 let toastTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -254,6 +272,28 @@ function say(msg: string) {
   toastMsg.value = msg
   if (toastTimer) clearTimeout(toastTimer)
   toastTimer = setTimeout(() => { toastMsg.value = '' }, 3600)
+}
+
+// ── Image upload ──────────────────────────────────────────────────────────────
+function triggerFileInput() {
+  if (!uploadingImg.value) fileInputRef.value?.click()
+}
+
+async function onFileChange(e: Event) {
+  const file = (e.target as HTMLInputElement).files?.[0]
+  if (!file || !draft.value) return
+  uploadError.value = ''
+  uploadingImg.value = true
+  try {
+    const res = await uploadMenuImage(file, token.value)
+    draft.value.image_url = res.image_url
+  } catch (err) {
+    uploadError.value = err instanceof ApiError ? err.message : 'Gagal mengupload foto.'
+  } finally {
+    uploadingImg.value = false
+    // reset input agar file yang sama bisa dipilih lagi
+    if (fileInputRef.value) fileInputRef.value.value = ''
+  }
 }
 
 // ── Dropdown close on outside click ─────────────────────────────────────────
@@ -403,5 +443,36 @@ async function saveDraft() {
   padding: 12px 18px; border-radius: 12px;
   font-size: .85rem; font-weight: 500;
   box-shadow: 0 8px 24px rgba(0,0,0,.3); text-align: center;
+}
+
+/* ── Image upload ── */
+.img-upload {
+  width: 100%;
+  height: 140px;
+  border: 2px dashed var(--line);
+  border-radius: 12px;
+  cursor: pointer;
+  overflow: hidden;
+  position: relative;
+  transition: border-color .2s;
+}
+.img-upload:hover { border-color: var(--brand); }
+.img-upload.uploading { opacity: .6; cursor: wait; }
+.img-preview {
+  width: 100%; height: 100%;
+  object-fit: cover; display: block;
+}
+.img-placeholder {
+  width: 100%; height: 100%;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 8px; color: var(--wwh-muted);
+  font-size: .8rem;
+}
+.img-change-label {
+  position: absolute; bottom: 0; left: 0; right: 0;
+  background: rgba(0,0,0,.5);
+  color: #fff; font-size: .75rem; font-weight: 600;
+  text-align: center; padding: 5px 0;
 }
 </style>

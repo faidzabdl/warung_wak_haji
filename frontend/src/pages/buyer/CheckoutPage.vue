@@ -203,8 +203,8 @@ function validate(): boolean {
   if (!tableNumber.value.trim()) {
     tableError.value = 'Nomor meja wajib diisi'
     ok = false
-  } else if (!/^\d{1,4}$/.test(tableNumber.value.trim())) {
-    tableError.value = 'Nomor meja harus 1–4 digit angka'
+  } else if (!/^[1-8]$/.test(tableNumber.value.trim())) {
+    tableError.value = 'Nomor meja harus angka 1–8'
     ok = false
   }
   if (!paymentMethod.value) {

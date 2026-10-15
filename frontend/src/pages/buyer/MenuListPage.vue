@@ -1,31 +1,36 @@
 <template>
-  <main class="wrap">
-    <!-- Role switch — hanya tampil jika sudah login sebagai seller -->
-    <div v-if="authStore.isLoggedIn" class="roles" role="tablist" aria-label="Mode tampilan">
-      <button
-        v-for="r in ROLES" :key="r.id" type="button" role="tab"
-        :class="{ on: role === r.id }"
-        :aria-selected="role === r.id"
-        @click="role = (r.id as 'pembeli' | 'penjual')"
-      >
-        {{ r.label }}
-        <i v-if="r.id === 'penjual' && pendingCount > 0" class="cnt">{{ pendingCount }}</i>
-      </button>
-    </div>
-
+  <main class="wrap wrap-flush">
     <!-- ── BUYER VIEW ──────────────────────────────────────────────────────── -->
     <template v-if="role === 'pembeli'">
-      <!-- Header -->
-      <header>
-        <div class="top">
-          <div class="logo" aria-hidden="true">🍽️</div>
-          <h1 class="brand">Warung Wak Haji</h1>
+      <!-- Header full-bleed (flush ke tepi atas, tanpa padding wrap) -->
+      <header class="hero-header">
+        <!-- Foto full width -->
+        <div class="hero-bg">
+          <img src="@/assets/image.png" alt="Kedai Wak Haji" class="hero-img" />
+          
+          <!-- Logo bulatan pojok kiri atas -->
+          <div class="hero-logo" aria-hidden="true">
+            <img
+              src="@/assets/logo.jpeg"
+              alt=""
+              width="104"
+              height="104"
+              loading="lazy"
+              decoding="async"
+            />
+          </div>
+          <h1 class="hero-title">Kedai Wak Haji</h1>
         </div>
-        <div class="hero">
-          <h2>Welcome To Our Restaurant</h2>
-          <p>Sajian Lezat Dengan Cita Rasa Istimewa<br>Siap Menemani Setiap Momenmu</p>
+        <!-- Bar coklat KEDAI WAK HAJI tepat di bawah foto -->
+        
+        <!-- Tagline -->
+        <div class="hero-tagline">
+          <p>"Menghadirkan Cita Rasa Klasik<br>Menyimpan Cerita di Setiap Sajian"</p>
         </div>
       </header>
+
+      <!-- Konten dengan padding -->
+      <div class="inner">
 
       <!-- Filters -->
       <div class="filters">
@@ -118,7 +123,7 @@
           <label for="meja">No. Meja:</label>
           <input id="meja" v-model="meja" placeholder="masukkan nomor meja" inputmode="numeric" @keyup.enter="submitForm" />
         </div>
-        <p v-if="tried && !mejaValid" class="err-msg">Isi dengan nomor meja (angka).</p>
+        <p v-if="tried && !mejaValid" class="err-msg">Nomor meja harus angka 1–8.</p>
 
         <!-- Payment options -->
         <fieldset class="pay">
@@ -141,6 +146,8 @@
           </button>
         </div>
       </section>
+
+      </div><!-- /inner -->
     </template>
 
     <!-- ── SELLER VIEW ─────────────────────────────────────────────────────── -->
@@ -194,6 +201,19 @@
           </button>
         </div>
       </div>
+    </div>
+
+    <!-- Toggle role (always visible when logged in) -->
+    <div v-if="authStore.isLoggedIn" class="hero-roles hero-roles-float" role="tablist" aria-label="Mode tampilan">
+      <button
+        v-for="r in ROLES" :key="r.id" type="button" role="tab"
+        :class="{ on: role === r.id }"
+        :aria-selected="role === r.id"
+        @click="role = (r.id as 'pembeli' | 'penjual')"
+      >
+        {{ r.label }}
+        <i v-if="r.id === 'penjual' && pendingCount > 0" class="cnt">{{ pendingCount }}</i>
+      </button>
     </div>
 
     <!-- Toast -->
@@ -285,7 +305,7 @@ const totalItems = computed(() => Object.values(cart.value).reduce((a, b) => a +
 const cartTotal = computed(() =>
   menus.value.reduce((s, m) => s + (cart.value[m.id] || 0) * parseFloat(m.price), 0)
 )
-const mejaValid = computed(() => /^\d{1,4}$/.test(meja.value.trim()))
+const mejaValid = computed(() => /^[1-8]$/.test(meja.value.trim()))
 const lines = computed(() =>
   menus.value
     .filter(m => cart.value[m.id])
@@ -445,4 +465,107 @@ onBeforeUnmount(() => {
 .t-enter-active, .t-leave-active { transition: opacity .25s, transform .25s; }
 .t-enter-from, .t-leave-to { opacity: 0; transform: translate(-50%, 10px); }
 .toast { position: fixed; z-index: 60; left: 50%; bottom: calc(20px + env(safe-area-inset-bottom,0px)); transform: translateX(-50%); max-width: calc(100% - 32px); background: var(--toast-bg); color: var(--toast-ink); padding: 12px 18px; border-radius: 12px; font-size: .85rem; font-weight: 500; box-shadow: 0 8px 24px rgba(0,0,0,.3); text-align: center; }
+
+/* ── Konten bawah header ── */
+.inner { padding: 0 18px; }
+
+/* ── Toggle role pojok kanan atas foto ── */
+.hero-roles {
+  position: absolute;
+  top: 10px; right: 10px;
+  display: flex;
+   background: rgba(63,42,26,.55);   /* sebelumnya rgba(255,255,255,.18) */
+  backdrop-filter: blur(6px);
+  border-radius: 999px;
+  padding: 3px;
+  gap: 2px;
+  z-index: 2;
+}
+.hero-roles button {
+  border: none; background: transparent;
+  color: #fff; font-size: .78rem; font-weight: 600;
+  padding: 5px 14px; border-radius: 999px;
+  cursor: pointer; transition: background .15s, color .15s;
+}
+.hero-roles button.on { background: var(--brand-dark); color: #fff; }
+
+/* ── Toggle float: fixed di atas seller view ── */
+.hero-roles-float {
+  position: fixed;
+  top: 10px; right: 10px;
+  z-index: 50;
+}
+
+/* ── Hero Header ── */
+.hero-header {
+  /* full viewport width, break keluar dari max-width wrap */
+  position: relative;
+  left: 50%; right: 50%;
+  margin-left: -50vw;
+  margin-right: -50vw;
+  width: 100vw;
+}
+.hero-bg {
+  position: relative;
+  width: 100%;
+  height: clamp(190px, 38vw, 420px);   /* layar lebar tidak terlalu gepeng */
+  overflow: hidden;
+  border-bottom: 8px solid #3f2a1a;
+}
+.hero-img {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  max-width: none;                      /* cegah batas lebar bawaan Tailwind */
+  object-fit: cover;
+  object-position: center 40%;
+  display: block;
+}
+.hero-logo {
+  position: absolute; top: 12px; left: 14px;
+  width: clamp(64px, 17vw, 104px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: #fff;                 /* menyatu dengan background putih logo */
+  border: 3px solid #3f2a1a;
+  box-shadow: 0 2px 10px rgba(0,0,0,.35);
+  overflow: hidden;
+  z-index: 2;
+}
+.hero-logo img {
+  width: 100%; height: 100%;
+  max-width: none;
+  object-fit: contain;              /* logo utuh, tidak terpotong */
+  padding: 6px;
+  display: block;
+}
+.hero-title {
+  position: absolute; left: 0; right: 0; bottom: 6px;
+  z-index: 1;
+  margin: 0; padding: 0 8px;
+  background: transparent;
+  color: #3f2a1a;
+  font-family: 'Sansita Swashed', 'Playfair Display', Georgia, serif;
+  font-size: clamp(2rem, 10.5vw, 4.6rem);
+  font-weight: 800;
+  font-style: normal;
+  white-space: nowrap;
+  text-align: center;
+  line-height: 1;
+  /* outline krem supaya tetap terbaca di atas foto tanpa overlay */
+  text-shadow:
+    -2px -2px 0 #e6d4a9, 2px -2px 0 #e6d4a9,
+    -2px 2px 0 #e6d4a9, 2px 2px 0 #e6d4a9,
+    0 0 12px rgba(230,212,169,.9);
+}
+.hero-tagline {
+  background: var(--bg);
+  text-align: center;
+  padding: 28px 20px 28px;
+  font-family: 'Cherry Swash', Georgia, serif;
+  font-weight: 700;
+  font-size: clamp(1.05rem, 4.4vw, 1.4rem);
+  font-style: normal;
+  color: #3f2a1a;
+  line-height: 1.4;
+}
 </style>
