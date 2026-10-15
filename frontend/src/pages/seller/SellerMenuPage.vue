@@ -258,15 +258,44 @@ const toastMsg = ref('')
 let toastTimer: ReturnType<typeof setTimeout> | null = null
 
 // ── Computed ─────────────────────────────────────────────────────────────────
-// reactive agar kategori baru yang ditambah user langsung muncul di filter & dropdown
 const DEFAULT_CATS: Record<string, string[]> = {
   Makanan: ['Main Dish', 'Side Dish'],
   Minuman: ['Coffee', 'Non Coffee'],
 }
-const CATS_BY_TYPE = reactive<Record<string, string[]>>({
-  Makanan: ['Main Dish', 'Side Dish'],
-  Minuman: ['Coffee', 'Non Coffee'],
-})
+
+const LS_KEY = 'wwh_custom_cats'
+
+// Baca kategori custom dari localStorage saat pertama kali load
+function loadStoredCats(): Record<string, string[]> {
+  try {
+    const raw = localStorage.getItem(LS_KEY)
+    if (raw) return JSON.parse(raw) as Record<string, string[]>
+  } catch { /* ignore */ }
+  return {}
+}
+
+function mergeWithDefaults(stored: Record<string, string[]>): Record<string, string[]> {
+  const result: Record<string, string[]> = {}
+  for (const type of ['Makanan', 'Minuman']) {
+    const defaults = DEFAULT_CATS[type] ?? []
+    const custom = (stored[type] ?? []).filter(c => !defaults.includes(c))
+    result[type] = [...defaults, ...custom]
+  }
+  return result
+}
+
+const CATS_BY_TYPE = reactive<Record<string, string[]>>(
+  mergeWithDefaults(loadStoredCats())
+)
+
+// Simpan kategori custom ke localStorage setiap kali CATS_BY_TYPE berubah
+watch(CATS_BY_TYPE, (val) => {
+  const custom: Record<string, string[]> = {}
+  for (const type of Object.keys(val)) {
+    custom[type] = val[type].filter(c => !(DEFAULT_CATS[type] ?? []).includes(c))
+  }
+  localStorage.setItem(LS_KEY, JSON.stringify(custom))
+}, { deep: true })
 
 const addingCat = ref(false)
 const newCatInput = ref('')
@@ -364,6 +393,14 @@ async function loadMenus() {
   loadError.value = null
   try {
     menus.value = await getSellerMenus(token.value)
+    // Sinkronisasi semua kategori dari DB ke CATS_BY_TYPE agar langsung muncul tanpa perlu buka Edit
+    for (const m of menus.value) {
+      if (!m.category || !m.menu_type) continue
+      if (!CATS_BY_TYPE[m.menu_type]) CATS_BY_TYPE[m.menu_type] = []
+      if (!CATS_BY_TYPE[m.menu_type].includes(m.category)) {
+        CATS_BY_TYPE[m.menu_type].push(m.category)
+      }
+    }
   } catch (e) {
     loadError.value = e instanceof ApiError ? e.message : 'Gagal memuat menu.'
   } finally {
@@ -433,7 +470,7 @@ function openEdit(m: MenuResponse) {
   draft.value = {
     id: m.id,
     name: m.name,
-    price: String(m.price),
+    price: String(Math.round(parseFloat(String(m.price)))),
     description: m.description ?? '',
     menu_type: m.menu_type,
     category: m.category,
