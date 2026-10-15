@@ -144,7 +144,7 @@
               class="dd-btn"
               type="button"
               style="width:100%"
-              @click="catDraftOpen = !catDraftOpen"
+              @click="catDraftOpen = !catDraftOpen; addingCat = false; newCatInput = ''"
               aria-haspopup="listbox"
             >
               {{ draft.category || 'Pilih kategori…' }}<i class="caret"></i>
@@ -154,9 +154,37 @@
                 v-for="c in draftCatOptions"
                 :key="c"
                 role="option"
+                class="cat-option"
                 :class="{ on: draft.category === c }"
-                @click="draft.category = c; catDraftOpen = false"
-              >{{ c }}</li>
+                @click="draft.category = c; catDraftOpen = false; addingCat = false"
+              >
+                <span class="cat-label">{{ c }}</span>
+                <!-- Hapus kategori hanya saat Tambah Menu (bukan Edit) -->
+                <button
+                  v-if="!draft.id && !isDefaultCat(draft.menu_type, c)"
+                  type="button"
+                  class="cat-del"
+                  title="Hapus kategori"
+                  @click.stop="deleteCategory(draft.menu_type, c)"
+                >×</button>
+              </li>
+              <!-- Tambah kategori hanya saat Tambah Menu (bukan Edit) -->
+              <template v-if="!draft.id">
+                <li v-if="!addingCat" role="option" class="add-cat-btn" @click.stop="addingCat = true">
+                  + Tambah Kategori
+                </li>
+                <li v-else role="option" class="add-cat-input-row" @click.stop>
+                  <input
+                    v-model="newCatInput"
+                    class="add-cat-input"
+                    placeholder="Nama kategori baru…"
+                    maxlength="40"
+                    @keydown.enter.prevent="saveNewCat"
+                    @keydown.escape.prevent="addingCat = false; newCatInput = ''"
+                  />
+                  <button type="button" class="add-cat-ok" @click.stop="saveNewCat">OK</button>
+                </li>
+              </template>
             </ul>
           </div>
         </div>
@@ -187,7 +215,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
+import { ref, reactive, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { getSellerMenus, createMenu, updateMenu, setMenuAvailability, deleteMenu, uploadMenuImage } from '@/lib/api'
 import { ApiError, type MenuResponse } from '@/types/api'
 import { useAuthStore } from '@/stores/auth'
@@ -230,13 +258,24 @@ const toastMsg = ref('')
 let toastTimer: ReturnType<typeof setTimeout> | null = null
 
 // ── Computed ─────────────────────────────────────────────────────────────────
-const CATS_BY_TYPE: Record<string, string[]> = {
+// reactive agar kategori baru yang ditambah user langsung muncul di filter & dropdown
+const DEFAULT_CATS: Record<string, string[]> = {
   Makanan: ['Main Dish', 'Side Dish'],
   Minuman: ['Coffee', 'Non Coffee'],
 }
+const CATS_BY_TYPE = reactive<Record<string, string[]>>({
+  Makanan: ['Main Dish', 'Side Dish'],
+  Minuman: ['Coffee', 'Non Coffee'],
+})
+
+const addingCat = ref(false)
+const newCatInput = ref('')
 
 const cats = computed(() => {
-  if (filterType.value === 'Semua') return ['Semua', 'Main Dish', 'Side Dish', 'Coffee', 'Non Coffee']
+  if (filterType.value === 'Semua') {
+    const all = new Set([...CATS_BY_TYPE.Makanan, ...CATS_BY_TYPE.Minuman])
+    return ['Semua', ...all]
+  }
   return ['Semua', ...(CATS_BY_TYPE[filterType.value] ?? [])]
 })
 
@@ -260,6 +299,8 @@ watch(cats, (newCats) => {
 watch(() => draft.value?.menu_type, () => {
   if (draft.value) draft.value.category = ''
   catDraftOpen.value = false
+  addingCat.value = false
+  newCatInput.value = ''
 })
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -373,11 +414,22 @@ async function doDelete(m: MenuResponse) {
 // ── Draft modal ───────────────────────────────────────────────────────────────
 function openCreate() {
   draftError.value = ''
+  addingCat.value = false
+  newCatInput.value = ''
   draft.value = { id: null, name: '', price: '', description: '', menu_type: 'Makanan', category: '', is_available: true, image_url: null }
 }
 
 function openEdit(m: MenuResponse) {
   draftError.value = ''
+  addingCat.value = false
+  newCatInput.value = ''
+  // pastikan kategori existing menu ada di daftar agar muncul di dropdown
+  if (m.category && m.menu_type) {
+    if (!CATS_BY_TYPE[m.menu_type]) CATS_BY_TYPE[m.menu_type] = []
+    if (!CATS_BY_TYPE[m.menu_type].includes(m.category)) {
+      CATS_BY_TYPE[m.menu_type].push(m.category)
+    }
+  }
   draft.value = {
     id: m.id,
     name: m.name,
@@ -391,7 +443,40 @@ function openEdit(m: MenuResponse) {
 }
 
 function closeDraft() {
-  if (!saving.value) draft.value = null
+  if (!saving.value) {
+    draft.value = null
+    addingCat.value = false
+    newCatInput.value = ''
+  }
+}
+
+function isDefaultCat(type: string, cat: string) {
+  return (DEFAULT_CATS[type] ?? []).includes(cat)
+}
+
+function deleteCategory(type: string, cat: string) {
+  const list = CATS_BY_TYPE[type]
+  if (!list) return
+  CATS_BY_TYPE[type] = list.filter(c => c !== cat)
+  // jika kategori yang dihapus sedang dipilih, reset
+  if (draft.value && draft.value.category === cat) {
+    draft.value.category = ''
+  }
+}
+
+function saveNewCat() {
+  const cat = newCatInput.value.trim()
+  if (!cat || !draft.value) return
+  const type = draft.value.menu_type
+  if (!CATS_BY_TYPE[type]) CATS_BY_TYPE[type] = []
+  // hindari duplikat (case-insensitive)
+  if (!CATS_BY_TYPE[type].some(c => c.toLowerCase() === cat.toLowerCase())) {
+    CATS_BY_TYPE[type].push(cat)
+  }
+  draft.value.category = CATS_BY_TYPE[type].find(c => c.toLowerCase() === cat.toLowerCase()) ?? cat
+  catDraftOpen.value = false
+  addingCat.value = false
+  newCatInput.value = ''
 }
 
 async function saveDraft() {
@@ -475,4 +560,69 @@ async function saveDraft() {
   color: #fff; font-size: .75rem; font-weight: 600;
   text-align: center; padding: 5px 0;
 }
+
+/* ── Tambah kategori baru ── */
+.add-cat-btn {
+  color: var(--brand);
+  font-size: .82rem;
+  font-weight: 600;
+  border-top: 1px solid var(--line);
+  margin-top: 2px;
+  padding-top: 8px !important;
+}
+.add-cat-btn:hover { background: var(--surface); }
+.add-cat-input-row {
+  display: flex !important;
+  gap: 6px;
+  padding: 6px 8px !important;
+  border-top: 1px solid var(--line);
+  cursor: default;
+}
+.add-cat-input {
+  flex: 1;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 5px 8px;
+  font-size: .82rem;
+  background: var(--bg);
+  color: var(--ink);
+  outline: none;
+}
+.add-cat-input:focus { border-color: var(--brand); }
+.add-cat-ok {
+  padding: 5px 12px;
+  border-radius: 8px;
+  background: var(--brand);
+  color: #fff;
+  font-size: .82rem;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.add-cat-ok:hover { opacity: .85; }
+
+/* ── Item kategori dengan tombol hapus ── */
+.cat-option {
+  display: flex !important;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+}
+.cat-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cat-del {
+  flex-shrink: 0;
+  width: 18px; height: 18px;
+  display: flex; align-items: center; justify-content: center;
+  border: none; border-radius: 4px;
+  background: transparent;
+  color: var(--wwh-muted);
+  font-size: .85rem; line-height: 1;
+  cursor: pointer;
+  padding: 0;
+  opacity: 0;
+  transition: opacity .15s, background .15s, color .15s;
+}
+.cat-option:hover .cat-del { opacity: 1; }
+.cat-del:hover { background: #fee2e2; color: #dc2626; }
 </style>
